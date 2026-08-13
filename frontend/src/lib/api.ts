@@ -58,6 +58,15 @@ export type DomainSummary = {
   topics: { slug: string; name: string; concepts: ConceptSummary[] }[];
 };
 
+export type Note = {
+  id: string;
+  title: string;
+  body_markdown: string;
+  is_global: boolean;
+  linked_concept_slug: string | null;
+  updated_at: string;
+};
+
 export const api = {
   login: (username: string, password: string) =>
     request<{ mfa_required: boolean }>("/auth/login", {
@@ -73,4 +82,17 @@ export const api = {
   logout: () => request<void>("/auth/logout", { method: "POST" }),
   listDomains: () => request<DomainSummary[]>("/content/domains"),
   getConcept: (slug: string) => request<ConceptDetail>(`/content/concepts/${slug}`),
+  listNotes: () => request<Note[]>("/notes"),
+  createNote: (title: string, body_markdown: string) =>
+    request<Note>("/notes", { method: "POST", body: JSON.stringify({ title, body_markdown }) }),
+  getNote: (id: string) => request<Note>(`/notes/${id}`),
+  updateNote: (id: string, title: string, body_markdown: string) =>
+    request<Note>(`/notes/${id}`, { method: "PUT", body: JSON.stringify({ title, body_markdown }) }),
+  deleteNote: (id: string) => request<void>(`/notes/${id}`, { method: "DELETE" }),
+  getNoteByConcept: (slug: string) => request<Note>(`/notes/by-concept/${slug}`),
+  putNoteByConcept: (slug: string, title: string, body_markdown: string) =>
+    request<Note>(`/notes/by-concept/${slug}`, {
+      method: "PUT",
+      body: JSON.stringify({ title, body_markdown }),
+    }),
 };
