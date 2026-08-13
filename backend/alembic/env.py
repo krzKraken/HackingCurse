@@ -11,6 +11,7 @@ from app.models import note  # noqa: F401 — registers note models with Base.me
 from app.models import question  # noqa: F401 — registers question models with Base.metadata
 from app.models import mastery  # noqa: F401 — registers mastery models with Base.metadata
 from app.models import review  # noqa: F401 — registers review models with Base.metadata
+from app.models import focus  # noqa: F401 — registers focus models with Base.metadata
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
