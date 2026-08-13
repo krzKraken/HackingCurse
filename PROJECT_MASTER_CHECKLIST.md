@@ -59,9 +59,10 @@
 - [x] Página `/dashboard` con tarjetas "Próximamente" para widgets aún no construidos
 
 ### Focus/Timer + "No sé qué estudiar"
-- [ ] LearningSession/FocusSession, timer (4 modos), Focus Mode
-- [ ] Session resume + context recap
-- [ ] Algoritmo de recomendación única ("No sé qué estudiar")
+- [x] LearningSession, timer (4 modos), Focus Mode
+- [x] Session resume (última posición)
+- [ ] Context recap (3 preguntas rápidas tras un hueco de varios días — no implementado en este sub-plan)
+- [x] Algoritmo de recomendación única ("No sé qué estudiar")
 
 ### Labs + orquestador Docker
 - [ ] Modelo Laboratory/LabInstance/LabAttempt + definición declarativa YAML
