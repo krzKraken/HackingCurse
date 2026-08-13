@@ -67,6 +67,31 @@ export type Note = {
   updated_at: string;
 };
 
+export type ReviewItemPrompt = {
+  item_id: string;
+  concept_slug: string;
+  type: "multiple_choice" | "true_false" | "free_explanation";
+  prompt_markdown: string;
+  options: string[] | null;
+};
+
+export type CreateReviewSessionParams = {
+  mode: string;
+  domain_slug?: string;
+  topic_slug?: string;
+  concept_slugs?: string[];
+  budget_count?: number;
+  budget_minutes?: number;
+};
+
+export type AnswerResult = {
+  outcome?: "correct" | "partial" | "incorrect";
+  correct_option_index?: number;
+  correct_bool?: boolean;
+  evaluation_criteria?: string;
+  expected_answer?: string;
+};
+
 export const api = {
   login: (username: string, password: string) =>
     request<{ mfa_required: boolean }>("/auth/login", {
@@ -94,5 +119,20 @@ export const api = {
     request<Note>(`/notes/by-concept/${slug}`, {
       method: "PUT",
       body: JSON.stringify({ title, body_markdown }),
+    }),
+  createReviewSession: (params: CreateReviewSessionParams) =>
+    request<{ session_id: string; items: ReviewItemPrompt[] }>("/reviews/sessions", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+  answerReviewItem: (itemId: string, user_response: string, confidence_declared?: string) =>
+    request<AnswerResult>(`/reviews/items/${itemId}/answer`, {
+      method: "POST",
+      body: JSON.stringify({ user_response, confidence_declared }),
+    }),
+  selfRateReviewItem: (itemId: string, outcome: string) =>
+    request<{ outcome: string }>(`/reviews/items/${itemId}/self-rate`, {
+      method: "POST",
+      body: JSON.stringify({ outcome }),
     }),
 };

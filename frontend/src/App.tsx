@@ -6,6 +6,7 @@ import { ProtectedRoute } from "./features/auth/ProtectedRoute";
 import { LessonPage } from "./features/lessons/LessonPage";
 import { NotesPage } from "./features/notes/NotesPage";
 import { NoteDetailPage } from "./features/notes/NoteDetailPage";
+import { ReviewPage } from "./features/reviews/ReviewPage";
 
 function Home() {
   return <h1>Dashboard (placeholder)</h1>;
@@ -23,6 +24,7 @@ export function App() {
             <Route path="/lessons/:slug" element={<LessonPage />} />
             <Route path="/notes" element={<NotesPage />} />
             <Route path="/notes/:id" element={<NoteDetailPage />} />
+            <Route path="/review" element={<ReviewPage />} />
           </Route>
         </Routes>
       </AuthProvider>
