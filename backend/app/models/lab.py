@@ -58,6 +58,7 @@ class LabInstance(Base):
     container_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     network_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     host_port: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    relay_pid: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     context_seed: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     hints_used: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     solved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

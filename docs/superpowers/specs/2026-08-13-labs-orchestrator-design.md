@@ -34,6 +34,7 @@ LabInstance
   container_id: str | null
   network_id: str | null
   host_port: int | null
+  relay_pid: int | null        (ver §2 — corrección de diseño, no publicación directa de puerto)
   context_seed: json          (ej. {"flag_token": "a3f9..."})
   hints_used: int, default 0
   solved: bool, default false
@@ -61,8 +62,13 @@ Worker (proceso Python separado — "rq worker labs")
    ▼
 Docker daemon del host
    → por instancia: red aislada (internal=True) + contenedor con
-     límites de CPU/memoria + puerto publicado efímero
+     límites de CPU/memoria + relay TCP del lado del host para
+     que el puerto sea alcanzable (ver corrección abajo)
 ```
+
+**Corrección de diseño (descubierta al implementar, verificada con Docker real):** Docker **rechaza explícitamente** publicar puertos (`-p`/`ports=`) en un contenedor cuya única red es `internal=True` — devuelve `403 Forbidden`, porque "no tiene sentido" publicar un puerto de una red sin salida al exterior. Publicar el puerto directamente, como decía la primera versión de este documento, es imposible con ese flag activo.
+
+La solución: el **host** siempre puede alcanzar una red bridge que él mismo creó (es el dueño de la interfaz del bridge), aunque esa red sea `internal=True` — lo que `internal=True` bloquea es la salida *del contenedor hacia afuera*, no la entrada *desde el host hacia el contenedor*. El worker levanta un pequeño **relay TCP en el host** (`worker/relay.py`, `asyncio`, sin dependencias) que escucha en un puerto efímero del host y reenvía bytes 1:1 hacia `container_ip:target_port` dentro de la red aislada. El estudiante se conecta al puerto del relay; el contenedor del lab sigue sin ninguna ruta de salida propia. Se ejecuta como subproceso independiente del worker (`subprocess.Popen`), con su PID guardado en `LabInstance.relay_pid` para poder terminarlo en `destroy_lab`.
 
 En desarrollo, el worker corre como proceso Python plano en el host (mismo patrón que `uvicorn` — no hay despliegue containerizado propio todavía), apuntando al Redis ya existente (puerto 6380).
 
@@ -72,14 +78,16 @@ provision_lab(instance_id)
   → genera context_seed (flag_token aleatorio)
   → crea red Docker aislada, labeled cyberlearn_instance_id=<id>
   → build/run del contenedor del lab, variables de entorno con context_seed,
-    conectado a esa red, puerto publicado en 0 (Docker asigna uno libre)
+    conectado a esa red (sin publicar puertos — ver corrección arriba)
   → aplica límites de recursos (mem_limit, nano_cpus)
-  → inspecciona el contenedor para leer el host_port asignado
-  → actualiza LabInstance: container_id, network_id, host_port,
+  → lee la IP del contenedor dentro de la red aislada
+  → arranca el relay TCP del host → container_ip:target_port,
+    obtiene host_port (efímero) y relay_pid
+  → actualiza LabInstance: container_id, network_id, host_port, relay_pid,
     status=running, started_at
 
 destroy_lab(instance_id)
-  → detiene y elimina contenedor + red + (si aplica) volúmenes
+  → termina el relay (SIGTERM al relay_pid), detiene y elimina contenedor + red
   → verifica que no queden recursos con esa label (limpieza real, no asumida)
   → status=destroyed, destroyed_at
 

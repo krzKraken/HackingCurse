@@ -135,6 +135,7 @@ class LabInstance(Base):
     container_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     network_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     host_port: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    relay_pid: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     context_seed: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     hints_used: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     solved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -610,9 +611,11 @@ git commit -m "feat: add idempotent lab catalog seed loader"
 - Test: `backend/tests/worker/test_docker_ops.py`
 
 **Interfaces:**
-- Produces: `get_client() -> docker.DockerClient`, `resolve_build_context(docker_build_context: str) -> Path`, `create_isolated_network(instance_id: str) -> str`, `run_lab_container(instance_id, docker_build_context, network_id, target_port, env, cpu_limit, memory_limit_mb) -> tuple[str, int]`, `destroy_lab_resources(container_id, network_id) -> None`, `verify_no_orphans(instance_id: str) -> bool`, and `LABEL_KEY` — consumed by Task 5's jobs and Task 8's security tests.
+- Produces: `get_client() -> docker.DockerClient`, `resolve_build_context(docker_build_context: str) -> Path`, `create_isolated_network(instance_id: str) -> str`, `run_lab_container(instance_id, docker_build_context, network_id, target_port, env, cpu_limit, memory_limit_mb) -> tuple[str, str]` (returns `container_id, container_ip` — see correction below), `start_port_relay(instance_id, container_ip, target_port) -> tuple[int, int]` (returns `host_port, relay_pid`), `stop_port_relay(relay_pid) -> None`, `destroy_lab_resources(container_id, network_id, relay_pid=None) -> None`, `verify_no_orphans(instance_id: str) -> bool`, and `LABEL_KEY` — consumed by Task 5's jobs and Task 8's security tests.
 
 **These are real integration tests against the Docker daemon** — no mocking, same philosophy as the rest of this project's tests against real Postgres/Redis.
+
+**Design correction, discovered by these very tests:** the original plan (and design spec's first draft) called for publishing the container's port directly via Docker (`ports={f"{target_port}/tcp": None}`). Running that against a real Docker daemon fails with `403 Forbidden` — **Docker refuses to publish ports on a container whose only network is `internal=True`**, since an internal network has no external connectivity by definition. The fix: the Docker **host** can always reach into a bridge network it created (it owns the bridge interface), even when that network is `internal=True` — only the *container's* outbound route is blocked, not the host's inbound one. So instead of Docker-native port publishing, `run_lab_container` returns the container's IP on the isolated network, and a separate `start_port_relay` launches a tiny host-side `asyncio` TCP relay (`worker/relay.py`, its own file, no dependencies) as an independent subprocess that forwards `host_port → container_ip:target_port`. Its PID is tracked (`LabInstance.relay_pid`, added via a follow-up migration `0009_add_relay_pid_to_lab_instances.py` after Task 1) so `destroy_lab` can terminate it. This is exactly the kind of thing real-Docker integration tests are for — a mocked test would never have caught it.
 
 - [ ] **Step 1: Add `docker` to requirements and install**
 
@@ -681,22 +684,25 @@ def test_create_and_destroy_isolated_network():
     assert docker_ops.verify_no_orphans("test-instance-1")
 
 
-def test_run_lab_container_publishes_port_and_is_reachable(temp_build_context):
+def test_run_lab_container_and_relay_makes_it_reachable_from_host(temp_build_context):
     from worker import docker_ops
 
     instance_id = "test-instance-2"
     network_id = docker_ops.create_isolated_network(instance_id)
     container_id = None
+    relay_pid = None
     try:
-        container_id, host_port = docker_ops.run_lab_container(
+        container_id, container_ip = docker_ops.run_lab_container(
             instance_id, temp_build_context, network_id, 9000, {}, "0.5", 128
         )
+        time.sleep(1)
+        host_port, relay_pid = docker_ops.start_port_relay(instance_id, container_ip, 9000)
         time.sleep(1)
         with socket.create_connection(("127.0.0.1", host_port), timeout=5) as sock:
             data = sock.recv(1024)
         assert data == b"hello\n"
     finally:
-        docker_ops.destroy_lab_resources(container_id, network_id)
+        docker_ops.destroy_lab_resources(container_id, network_id, relay_pid)
     assert docker_ops.verify_no_orphans(instance_id)
 ```
 
@@ -707,10 +713,71 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'worker.docker_ops'`
 
 - [ ] **Step 4: Write `backend/worker/__init__.py`** (empty file)
 
-- [ ] **Step 5: Write `backend/worker/docker_ops.py`**
+- [ ] **Step 5: Write `backend/worker/relay.py`**
 
 ```python
+import asyncio
+import sys
+
+
+async def _pipe(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    try:
+        while True:
+            data = await reader.read(4096)
+            if not data:
+                break
+            writer.write(data)
+            await writer.drain()
+    except (ConnectionResetError, BrokenPipeError):
+        pass
+    finally:
+        writer.close()
+
+
+async def _handle(
+    client_reader: asyncio.StreamReader,
+    client_writer: asyncio.StreamWriter,
+    target_host: str,
+    target_port: int,
+) -> None:
+    try:
+        remote_reader, remote_writer = await asyncio.open_connection(target_host, target_port)
+    except OSError:
+        client_writer.close()
+        return
+    await asyncio.gather(
+        _pipe(client_reader, remote_writer),
+        _pipe(remote_reader, client_writer),
+    )
+
+
+async def main(listen_port: int, target_host: str, target_port: int) -> None:
+    server = await asyncio.start_server(
+        lambda r, w: _handle(r, w, target_host, target_port), "0.0.0.0", listen_port
+    )
+    async with server:
+        await server.serve_forever()
+
+
+if __name__ == "__main__":
+    # argv: listen_port target_host target_port instance_id
+    # instance_id is accepted only so the process is identifiable in `ps`
+    # output for manual debugging — it plays no role in the relay logic.
+    listen_port_arg = int(sys.argv[1])
+    target_host_arg = sys.argv[2]
+    target_port_arg = int(sys.argv[3])
+    asyncio.run(main(listen_port_arg, target_host_arg, target_port_arg))
+```
+
+- [ ] **Step 6: Write `backend/worker/docker_ops.py`**
+
+```python
+import os
 import pathlib
+import signal
+import socket
+import subprocess
+import sys
 
 import docker
 from docker.errors import NotFound
@@ -757,7 +824,14 @@ def run_lab_container(
     env: dict,
     cpu_limit: str,
     memory_limit_mb: int,
-) -> tuple[str, int]:
+) -> tuple[str, str]:
+    """Builds and runs the lab container on the isolated network.
+
+    Returns (container_id, container_ip). Docker forbids publishing ports
+    on a container whose only network is `internal=True` — see the
+    correction note above this task. Use `start_port_relay` to make it
+    reachable from the host.
+    """
     client = get_client()
     build_path = resolve_build_context(docker_build_context)
     image, _logs = client.images.build(path=str(build_path), tag=f"cyberlearn-lab-{instance_id}", rm=True)
@@ -766,19 +840,50 @@ def run_lab_container(
         image.id,
         detach=True,
         network=network_id,
-        ports={f"{target_port}/tcp": None},
         environment=env,
         labels={LABEL_KEY: instance_id},
         mem_limit=f"{memory_limit_mb}m",
         nano_cpus=int(float(cpu_limit) * 1_000_000_000),
     )
     container.reload()
-    port_bindings = container.attrs["NetworkSettings"]["Ports"][f"{target_port}/tcp"]
-    host_port = int(port_bindings[0]["HostPort"])
-    return container.id, host_port
+    networks = container.attrs["NetworkSettings"]["Networks"]
+    container_ip = next(iter(networks.values()))["IPAddress"]
+    return container.id, container_ip
 
 
-def destroy_lab_resources(container_id: str | None, network_id: str | None) -> None:
+def _pick_free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("0.0.0.0", 0))
+        return s.getsockname()[1]
+
+
+def start_port_relay(instance_id: str, container_ip: str, target_port: int) -> tuple[int, int]:
+    """Starts a host-side TCP relay so a container on an `internal=True`
+    network is still reachable from outside. Returns (host_port, relay_pid).
+    """
+    host_port = _pick_free_port()
+    relay_module = pathlib.Path(__file__).resolve().parent / "relay.py"
+    process = subprocess.Popen(
+        [sys.executable, str(relay_module), str(host_port), container_ip, str(target_port), instance_id],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return host_port, process.pid
+
+
+def stop_port_relay(relay_pid: int | None) -> None:
+    if relay_pid is None:
+        return
+    try:
+        os.kill(relay_pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+
+
+def destroy_lab_resources(
+    container_id: str | None, network_id: str | None, relay_pid: int | None = None
+) -> None:
+    stop_port_relay(relay_pid)
     client = get_client()
     if container_id:
         try:
@@ -801,16 +906,26 @@ def verify_no_orphans(instance_id: str) -> bool:
     return not containers and not networks
 ```
 
-- [ ] **Step 6: Run it to verify it passes**
+- [ ] **Step 7: Run it to verify it passes**
 
 Run: `pytest tests/worker/test_docker_ops.py -v`
 Expected: PASS (3 tests). This will take longer than other test files (~10-30s) because it builds a real Docker image — that's expected.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Add `relay_pid` to `LabInstance` and commit**
+
+`internal=True` networks blocking port publishing (discovered above) wasn't known when Task 1's model was written, so `relay_pid` needs a follow-up migration:
 
 ```bash
-git add backend/requirements.txt backend/worker/__init__.py backend/worker/docker_ops.py backend/tests/worker/__init__.py backend/tests/worker/test_docker_ops.py
-git commit -m "feat: add Docker orchestration primitives (isolated network, container lifecycle)"
+cd backend
+# add `relay_pid: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)` to LabInstance in app/models/lab.py
+alembic revision --autogenerate -m "add relay_pid to lab_instances"
+mv alembic/versions/<generated_hash>_add_relay_pid_to_lab_instances.py alembic/versions/0009_add_relay_pid_to_lab_instances.py
+alembic upgrade head
+```
+
+```bash
+git add backend/requirements.txt backend/worker/__init__.py backend/worker/relay.py backend/worker/docker_ops.py backend/tests/worker/__init__.py backend/tests/worker/test_docker_ops.py backend/app/models/lab.py backend/alembic/versions/0009_add_relay_pid_to_lab_instances.py
+git commit -m "feat: add Docker orchestration primitives (isolated network, container lifecycle, host-side relay)"
 ```
 
 ---
