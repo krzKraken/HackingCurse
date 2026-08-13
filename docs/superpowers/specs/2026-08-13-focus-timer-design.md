@@ -8,6 +8,7 @@
 1. **`LearningSession` y `FocusSession` se fusionan en un solo modelo.** El spec de Fase 0 los separaba, pero en la práctica toda sesión activa tiene configuración de timer desde el inicio (con defaults) — no hay caso real donde exista una sin la otra. Una sola tabla `LearningSession` con los campos de timer embebidos.
 2. **El algoritmo "No sé qué estudiar" usa 3 señales** (forgetting_risk, debilidad/`1 - mastery_score`, "siguiente en el roadmap": concepto nunca estudiado cuyos prerequisitos ya están completos) en vez de las 5 del spec de Fase 0 — fragmentación y errores personales no existen todavía como módulos.
 3. **Selección por prioridad en niveles, no por suma ponderada de pesos.** Más explicable y depurable que ajustar constantes arbitrarias: (1) si algo está vencido, recomendar lo más vencido; si no, (2) si hay un concepto "siguiente" nunca estudiado con prerequisitos satisfechos, recomendarlo; si no, (3) recomendar el concepto con `mastery_score` más bajo para repaso ligero; si no hay contenido en absoluto, no hay recomendación.
+4. **No se implementa "context recap"** (master prompt §52: 3 preguntas rápidas si han pasado varios días desde la última sesión). Este sub-plan solo cubre resume de posición (`last_position`). Context recap queda pendiente, registrado en el checklist — se puede construir reutilizando `ReviewSelector` con `budget_count=3` filtrado a los conceptos de la última sesión, una vez que valga la pena esa capa adicional de fricción de reentrada.
 
 ## 1. Modelo de datos
 
