@@ -1021,6 +1021,7 @@ def test_provision_lab_creates_running_instance_reachable_over_tcp(db_session):
 
         assert instance.status == LabInstanceStatus.running
         assert instance.host_port is not None
+        assert instance.relay_pid is not None
         assert "flag_token" in instance.context_seed
 
         time.sleep(1)
@@ -1105,7 +1106,7 @@ def provision_lab(instance_id: str) -> None:
         instance.context_seed = {"flag_token": flag_token}
 
         network_id = docker_ops.create_isolated_network(str(instance.id))
-        container_id, host_port = docker_ops.run_lab_container(
+        container_id, container_ip = docker_ops.run_lab_container(
             str(instance.id),
             laboratory.docker_build_context,
             network_id,
@@ -1114,10 +1115,12 @@ def provision_lab(instance_id: str) -> None:
             laboratory.cpu_limit,
             laboratory.memory_limit_mb,
         )
+        host_port, relay_pid = docker_ops.start_port_relay(str(instance.id), container_ip, TARGET_PORT)
 
         instance.network_id = network_id
         instance.container_id = container_id
         instance.host_port = host_port
+        instance.relay_pid = relay_pid
         instance.status = LabInstanceStatus.running
         instance.started_at = datetime.now(timezone.utc)
         db.commit()
@@ -1137,11 +1140,12 @@ def destroy_lab(instance_id: str) -> None:
         instance = db.query(LabInstance).filter(LabInstance.id == instance_id).first()
         if instance is None:
             return
-        docker_ops.destroy_lab_resources(instance.container_id, instance.network_id)
+        docker_ops.destroy_lab_resources(instance.container_id, instance.network_id, instance.relay_pid)
         instance.status = LabInstanceStatus.destroyed
         instance.destroyed_at = datetime.now(timezone.utc)
         instance.container_id = None
         instance.network_id = None
+        instance.relay_pid = None
         db.commit()
     finally:
         db.close()
@@ -1174,11 +1178,12 @@ def sweep_expired_labs() -> None:
             laboratory = db.query(Laboratory).filter(Laboratory.id == instance.laboratory_id).first()
             elapsed_min = (now - instance.started_at).total_seconds() / 60
             if elapsed_min > laboratory.max_lifetime_min:
-                docker_ops.destroy_lab_resources(instance.container_id, instance.network_id)
+                docker_ops.destroy_lab_resources(instance.container_id, instance.network_id, instance.relay_pid)
                 instance.status = LabInstanceStatus.expired
                 instance.destroyed_at = now
                 instance.container_id = None
                 instance.network_id = None
+                instance.relay_pid = None
         db.commit()
     finally:
         db.close()
@@ -1187,12 +1192,23 @@ def sweep_expired_labs() -> None:
 - [ ] **Step 6: Run it to verify it passes**
 
 Run: `pytest tests/worker/test_jobs.py -v`
-Expected: PASS (3 tests). These build and run the real FlagBox image — slower than typical tests, that's expected.
+
+**If you hit `psycopg.errors.FeatureNotSupported: cached plan must not change result type`:** this is a pre-existing test-infrastructure issue, not a bug in the code above — psycopg3 auto-prepares statements after a few executions on a pooled connection, and this test file is the first one to run enough sequential queries (via `worker`'s own `SessionLocal()` calls across provision/destroy/reset/sweep) to trigger it against a connection whose pooled peer had a table dropped/recreated by the `tests/conftest.py` fixture in between. Fix `backend/app/db.py` by disabling server-side prepare:
+
+```python
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    connect_args={"prepare_threshold": None},
+)
+```
+
+Then re-run. Expected: PASS (3 tests). These build and run the real FlagBox image — slower than typical tests, that's expected.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add backend/requirements.txt backend/worker/flag.py backend/worker/jobs.py backend/tests/worker/test_jobs.py
+git add backend/requirements.txt backend/worker/flag.py backend/worker/jobs.py backend/tests/worker/test_jobs.py backend/app/db.py
 git commit -m "feat: add lab provisioning/destroy/reset/expiry-sweep jobs"
 ```
 
