@@ -622,10 +622,10 @@ def get_current_session_endpoint(
     return _to_session_out(session)
 
 
-def _get_session_or_404(db: Session, user: User, session_id: str) -> LearningSession:
+def _get_session_or_404(db: Session, user: User, learning_session_id: str) -> LearningSession:
     session = (
         db.query(LearningSession)
-        .filter(LearningSession.id == session_id, LearningSession.user_id == user.id)
+        .filter(LearningSession.id == learning_session_id, LearningSession.user_id == user.id)
         .first()
     )
     if session is None:
@@ -633,14 +633,14 @@ def _get_session_or_404(db: Session, user: User, session_id: str) -> LearningSes
     return session
 
 
-@router.patch("/sessions/{session_id}", response_model=SessionOut)
+@router.patch("/sessions/{learning_session_id}", response_model=SessionOut)
 def update_session_endpoint(
-    session_id: str,
+    learning_session_id: str,
     payload: SessionUpdate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> SessionOut:
-    session = _get_session_or_404(db, user, session_id)
+    session = _get_session_or_404(db, user, learning_session_id)
     session = service.update_session(
         db,
         session,
@@ -652,11 +652,11 @@ def update_session_endpoint(
     return _to_session_out(session)
 
 
-@router.post("/sessions/{session_id}/end", response_model=SessionOut)
+@router.post("/sessions/{learning_session_id}/end", response_model=SessionOut)
 def end_session_endpoint(
-    session_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+    learning_session_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
 ) -> SessionOut:
-    session = _get_session_or_404(db, user, session_id)
+    session = _get_session_or_404(db, user, learning_session_id)
     return _to_session_out(service.end_session(db, session))
 
 
@@ -671,6 +671,8 @@ def get_recommendation_endpoint(
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     return RecommendationOut(**rec)
 ```
+
+**Note on the `learning_session_id` naming:** the path parameter is deliberately *not* called `session_id`, even though that would read more naturally. `app.auth.dependencies.get_current_user` (scaffolding+auth plan) declares its own cookie parameter literally named `session_id` (`Cookie(default=None, alias=settings.cookie_name)`). FastAPI's dependant resolution merges parameters by name across a route and its sub-dependencies, so a path param also named `session_id` collides with it and raises `AssertionError: Cannot use Cookie for path param 'session_id'` at import time. Naming it `learning_session_id` avoids the collision.
 
 - [ ] **Step 3: Mount it in `backend/app/main.py`**
 
