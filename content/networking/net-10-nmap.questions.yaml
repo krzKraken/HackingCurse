@@ -1,0 +1,67 @@
+concept_slug: net-10-nmap
+questions:
+  - type: multiple_choice
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          Ejecutas `nmap` sin privilegios de root/administrador. ¿Qué tipo de escaneo de puertos usa Nmap por
+          defecto en ese caso, y por qué?
+        options:
+          - "TCP connect scan (-sT), porque sin acceso a raw sockets Nmap usa las llamadas de socket normales del sistema operativo, completando el handshake."
+          - "SYN scan (-sS), porque no requiere privilegios especiales en ningún sistema operativo moderno."
+          - "UDP scan (-sU), porque es el único tipo de escaneo que no requiere privilegios elevados."
+          - "Nmap se niega a escanear puertos sin privilegios de administrador, mostrando solo un error."
+        correct_option_index: 0
+  - type: multiple_choice
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          Un escaneo Nmap reporta un puerto como "filtered". ¿Qué significa esto y en qué se diferencia de
+          "closed"?
+        options:
+          - "Significa que el puerto está cerrado y además protegido por un antivirus; closed solo significa cerrado sin protección adicional."
+          - "Son sinónimos exactos: ambos indican que no hay ningún servicio escuchando en ese puerto."
+          - "Significa que Nmap no pudo determinar el estado porque el probe fue descartado silenciosamente (por ejemplo por un firewall); closed significa que Nmap recibió una respuesta activa (RST) confirmando que no hay servicio."
+          - "Filtered significa que el puerto está abierto pero limitado por rate limiting; closed significa que nunca ha tenido ningún servicio."
+        correct_option_index: 2
+  - type: true_false
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          Por defecto, sin usar la opción `-p-`, Nmap escanea únicamente los primeros 1000 puertos TCP
+          numéricamente consecutivos (del 1 al 1000).
+        correct_bool: false
+  - type: true_false
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          La detección de sistema operativo de Nmap (`-O`) es una inferencia estadística basada en
+          peculiaridades de la pila TCP/IP del objetivo, no una consulta directa y garantizada.
+        correct_bool: true
+  - type: free_explanation
+    difficulty: 4
+    evaluation_criteria: |
+      La respuesta debe: (1) explicar que el escaneo UDP es intrínsecamente más ambiguo que el TCP porque la
+      ausencia de respuesta a un datagrama puede significar "abierto sin servicio que responda a ese payload
+      concreto" o "filtrado", sin diferencia observable directa; (2) explicar que Nmap mitiga esto con probes
+      específicos por protocolo/servicio para forzar una respuesta real; (3) contrastar con el mecanismo del SYN
+      scan en TCP, donde SYN-ACK versus RST sí distingue de forma más clara abierto de cerrado; (4) mencionar
+      que aun con probes, el escaneo UDP completo es notablemente más lento que un SYN scan TCP equivalente.
+    expected_answer: |
+      El escaneo UDP es intrínsecamente más lento y ambiguo que el escaneo TCP por SYN. En TCP, un SYN scan
+      obtiene una respuesta clara en la mayoría de los casos: SYN-ACK significa puerto abierto, RST significa
+      puerto cerrado, y solo la ausencia total de respuesta indica filtrado por firewall. En UDP no existe un
+      equivalente al RST: si Nmap envía un datagrama UDP genérico y no recibe respuesta, no puede distinguir con
+      certeza entre "el puerto está abierto pero el servicio no respondió a ese payload en particular" y "el
+      puerto está filtrado por un firewall que descarta el tráfico silenciosamente" — en ambos casos el
+      resultado observado es el mismo silencio. Para reducir esta ambigüedad, Nmap usa probes específicos por
+      protocolo (payloads diseñados para provocar una respuesta real de servicios UDP conocidos, como DNS o
+      SNMP), aumentando la probabilidad de obtener una respuesta positiva que confirme el puerto como
+      efectivamente abierto. Aun así, construir y enviar estos probes específicos por cada puerto y servicio
+      hace que un escaneo UDP completo sea órdenes de magnitud más lento que un SYN scan TCP equivalente sobre
+      el mismo rango de puertos.
+    variants:
+      - prompt_markdown: |
+          Explica por qué el escaneo UDP de Nmap es más lento y ambiguo que un SYN scan TCP: ¿qué hace que sea
+          difícil distinguir un puerto UDP abierto de uno filtrado, y cómo intenta Nmap reducir esa ambigüedad?
+

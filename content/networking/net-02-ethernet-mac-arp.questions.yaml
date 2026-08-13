@@ -1,0 +1,65 @@
+concept_slug: net-02-ethernet-mac-arp
+questions:
+  - type: multiple_choice
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          ¿Qué hace exactamente un ARP Request y a quién se lo envía?
+        options:
+          - "Pregunta '¿quién tiene esta IP?' y se envía en unicast directamente al host que se cree dueño de esa IP."
+          - "Pregunta '¿quién tiene esta IP?' y se envía en broadcast, así que todos los hosts de la LAN lo reciben."
+          - "Pregunta '¿cuál es tu IP?' y se envía en broadcast a toda la LAN, incluyendo otras subredes conectadas por router."
+          - "Pregunta '¿quién tiene esta MAC?' y se envía en broadcast, para que el dueño de esa MAC responda con su IP."
+        correct_option_index: 1
+  - type: multiple_choice
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          Un empleado conecta un dispositivo Wi-Fi al aeropuerto y observa que su MAC visible cambia cada vez
+          que se reconecta a la misma red. ¿Cuál es la explicación técnica más probable?
+        options:
+          - "El punto de acceso está reasignando manualmente una nueva MAC a cada cliente por seguridad."
+          - "El fabricante de la tarjeta de red tiene un error de firmware que corrompe la MAC grabada de fábrica."
+          - "El sistema operativo está aleatorizando la MAC en redes Wi-Fi por privacidad, un comportamiento habitual en dispositivos modernos."
+          - "ARP está reescribiendo la MAC del dispositivo cada vez que responde a un ARP Request del punto de acceso."
+        correct_option_index: 2
+  - type: true_false
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          ARP solo funciona dentro del mismo segmento de capa 2 (broadcast domain): un router no reenvía ARP
+          Requests entre redes distintas.
+        correct_bool: true
+  - type: true_false
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          Si un host recibe una respuesta ARP (ARP Reply) que no corresponde a ninguna petición ARP que él
+          mismo haya enviado, la mayoría de implementaciones de red la descartan automáticamente por no
+          coincidir con una solicitud previa.
+        correct_bool: false
+  - type: free_explanation
+    difficulty: 4
+    evaluation_criteria: |
+      La respuesta debe: (1) identificar que ARP no tiene ningún mecanismo de autenticación ni verificación de
+      origen; (2) explicar que muchas pilas de red aceptan respuestas ARP no solicitadas (gratuitous ARP) y
+      sobrescriben la caché sin más comprobación; (3) describir el mecanismo concreto del ataque (el atacante
+      envía ARP Replies falsos diciendo ser el gateway y/o la víctima, envenenando ambas cachés); (4) mencionar
+      al menos una defensa real de infraestructura, como Dynamic ARP Inspection (DAI), y no solo detección
+      pasiva.
+    expected_answer: |
+      ARP fue diseñado sin ningún mecanismo de autenticación: cualquier host de la LAN puede enviar una
+      respuesta ARP (incluso sin que nadie la haya pedido, lo que se llama gratuitous ARP) y la mayoría de
+      sistemas la aceptan sin verificar que corresponda a una petición previa, sobrescribiendo su caché ARP con
+      esa información. Esto es exactamente lo que explota el ARP spoofing: el atacante envía respuestas ARP
+      falsas diciendo "yo soy el gateway" a la víctima, y "yo soy la víctima" al gateway (o a otro host),
+      envenenando las cachés de ambos extremos para que todo el tráfico entre ellos pase físicamente por el
+      atacante, logrando un Man-in-the-Middle dentro de la LAN. La defensa real de infraestructura es Dynamic
+      ARP Inspection (DAI) en switches gestionados, que valida cada paquete ARP contra una tabla de bindings
+      IP-MAC conocida (normalmente alimentada por DHCP Snooping) y descarta los que no cuadran, en vez de
+      confiar ciegamente en lo que dice cada host.
+    variants:
+      - prompt_markdown: |
+          Explica por qué ARP es vulnerable a ataques de spoofing/poisoning: ¿qué característica de diseño del
+          protocolo lo permite, cómo funciona concretamente el ataque, y qué defensa real de infraestructura
+          existe contra él?

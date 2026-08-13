@@ -1,0 +1,66 @@
+concept_slug: net-01-fundamentals
+questions:
+  - type: multiple_choice
+    difficulty: 1
+    variants:
+      - prompt_markdown: |
+          ¿Cuál de las siguientes afirmaciones describe mejor por qué las redes se diseñan en capas?
+        options:
+          - "Porque cada capa resuelve un problema concreto y le entrega el resultado a la siguiente sin necesitar saber cómo la otra capa hizo su trabajo."
+          - "Porque el hardware de red solo puede procesar un protocolo a la vez, y las capas evitan conflictos entre protocolos."
+          - "Porque el modelo OSI es un estándar legal obligatorio que todos los sistemas operativos deben implementar exactamente igual."
+          - "Porque cada capa necesita conocer los detalles internos de las demás para poder encapsular los datos correctamente."
+        correct_option_index: 0
+  - type: multiple_choice
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          Capturas con Wireshark el tráfico de tu equipo mientras visitas `https://ejemplo.com`, un servidor que
+          NO está en tu misma LAN. ¿Qué combinación de MAC destino e IP destino esperas ver en la trama Ethernet
+          y el paquete IP resultantes?
+        options:
+          - "MAC destino = la de tu propio equipo, IP destino = la del servidor ejemplo.com."
+          - "MAC destino = la de tu gateway, IP destino = la del servidor ejemplo.com."
+          - "MAC destino = la del servidor ejemplo.com, IP destino = la de tu gateway."
+          - "MAC destino = la del servidor ejemplo.com, IP destino = la del servidor ejemplo.com."
+        correct_option_index: 1
+  - type: true_false
+    difficulty: 1
+    variants:
+      - prompt_markdown: |
+          El modelo TCP/IP de 4 capas que realmente implementan los sistemas operativos es idéntico en número
+          y nombre de capas al modelo OSI de 7 capas.
+        correct_bool: false
+  - type: true_false
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          Un host puede tener varias direcciones IP asignadas a una misma interfaz de red al mismo tiempo (IP
+          aliasing).
+        correct_bool: true
+  - type: free_explanation
+    difficulty: 3
+    evaluation_criteria: |
+      La respuesta debe: (1) explicar el concepto de encapsulación, es decir, que cada capa añade su propia
+      cabecera al dato de la capa superior conforme baja hacia el medio físico; (2) mencionar el orden correcto
+      de encapsulación de arriba hacia abajo (aplicación → transporte → internet → acceso a red) y que el
+      receptor desencapsula en orden inverso (de abajo hacia arriba); (3) explicar por qué esta ignorancia mutua
+      entre capas es intencional (abstracción) y qué beneficio práctico aporta (por ejemplo, que el mismo
+      protocolo IP funcione igual sobre Wi-Fi, fibra o 4G sin cambios).
+    expected_answer: |
+      Cuando un equipo envía datos, cada capa del modelo TCP/IP añade su propia cabecera a los datos que recibe
+      de la capa superior, sin modificar ni necesitar entender ese contenido: la capa de aplicación genera el
+      dato (por ejemplo una petición HTTP), la capa de transporte lo envuelve en un segmento TCP o UDP con
+      puertos origen/destino, la capa de internet lo envuelve en un paquete IP con direcciones IP origen/destino,
+      y la capa de acceso a red lo envuelve en una trama Ethernet (o Wi-Fi) con direcciones MAC. Es como meter
+      sobres dentro de sobres. El receptor hace el proceso inverso: quita la cabecera de acceso a red, luego la
+      de internet, luego la de transporte, hasta llegar al dato de aplicación original. Esta separación es
+      intencional: TCP no sabe que va sobre Ethernet, y Ethernet no sabe que lleva TCP dentro. Gracias a esa
+      ignorancia mutua (abstracción), el mismo protocolo IP puede viajar indistintamente sobre Wi-Fi, fibra o
+      4G sin que haya que rediseñar nada en las capas superiores, y viceversa, Ethernet puede transportar
+      cualquier protocolo de capa superior sin conocerlo.
+    variants:
+      - prompt_markdown: |
+          Explica qué es la encapsulación en el modelo de capas TCP/IP: qué le ocurre a un dato de aplicación
+          conforme baja por las capas hasta salir al medio físico, y por qué cada capa "ignora" el contenido
+          de las demás.

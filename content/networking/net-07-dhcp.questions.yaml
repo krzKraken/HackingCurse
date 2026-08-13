@@ -1,0 +1,70 @@
+concept_slug: net-07-dhcp
+questions:
+  - type: multiple_choice
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          ¿Cuál es el orden correcto de los cuatro mensajes del proceso DORA en DHCP?
+        options:
+          - "Discover, Offer, Request, Acknowledge"
+          - "Discover, Request, Offer, Acknowledge"
+          - "Offer, Discover, Acknowledge, Request"
+          - "Request, Discover, Offer, Acknowledge"
+        correct_option_index: 0
+  - type: multiple_choice
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          El mensaje DHCP Request, con el que el cliente acepta formalmente una oferta de IP, se envía en
+          broadcast en vez de unicast directo al servidor elegido. ¿Por qué?
+        options:
+          - "Porque el cliente todavía no conoce la IP del servidor DHCP en ese punto del proceso."
+          - "Por compatibilidad histórica con BOOTP, sin ninguna razón funcional en las redes modernas."
+          - "Para que el router de la red pueda registrar la asignación en su tabla de rutas."
+          - "Para que todos los demás servidores DHCP que hicieron una oferta sepan que la suya no fue aceptada y liberen esa IP reservada."
+        correct_option_index: 3
+  - type: true_false
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          DHCP incluye un mecanismo de autenticación nativo que impide que un dispositivo no autorizado se
+          anuncie como servidor DHCP en la LAN.
+        correct_bool: false
+  - type: true_false
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          La mayoría de sistemas mantienen la última configuración de red conocida funcionando incluso tras
+          expirar el lease, hasta que un intento de renovación o un nuevo DORA fallan explícitamente.
+        correct_bool: true
+  - type: free_explanation
+    difficulty: 4
+    evaluation_criteria: |
+      La respuesta debe: (1) explicar por qué un rogue DHCP funciona sin necesitar "vencer en autoridad" al
+      servidor legítimo — el cliente acepta la primera oferta que recibe; (2) explicar el mecanismo de DHCP
+      starvation (agotar el pool del servidor legítimo con Discovers falsificados) y por qué combinarlo con un
+      rogue DHCP es más fiable que solo levantar un servidor rogue paralelo; (3) mencionar DHCP Snooping como la
+      mitigación estándar en switches gestionados, explicando la distinción entre puertos trusted/untrusted;
+      (4) idealmente conectar esto con Dynamic ARP Inspection (DAI), que depende de los bindings generados por
+      DHCP Snooping.
+    expected_answer: |
+      Un ataque de rogue DHCP consiste en levantar un servidor DHCP no autorizado en la LAN para entregar a
+      nuevas víctimas un gateway y/o DNS controlados por el atacante, logrando un Man-in-the-Middle persistente
+      sin necesitar reenvenenar ARP continuamente. Este ataque no necesita "ganarle en autoridad" al servidor
+      legítimo, porque DHCP no tiene ningún concepto de servidor autorizado: el cliente simplemente acepta la
+      primera oferta (Offer) que le llegue, sea legítima o no. Para hacer el ataque más fiable, se puede combinar
+      con DHCP starvation: el atacante envía muchos mensajes Discover con direcciones MAC falsificadas
+      distintas, agotando el pool de direcciones disponibles del servidor legítimo. Con el servidor legítimo sin
+      IPs que ofrecer, los nuevos clientes quedan forzados a aceptar la oferta del servidor rogue, eliminando la
+      carrera de "quién responde primero". La mitigación estándar en infraestructura es DHCP Snooping en
+      switches gestionados: el switch clasifica sus puertos como "trusted" (donde se permite tráfico de servidor
+      DHCP, normalmente el uplink hacia el servidor legítimo) y "untrusted" (puertos de usuario, donde se
+      descartan paquetes Offer/Ack que no deberían originarse ahí). Esta misma tabla de bindings IP-MAC que
+      genera DHCP Snooping es la que usa después Dynamic ARP Inspection (DAI) para validar respuestas ARP, por
+      lo que ambas defensas casi siempre se despliegan juntas.
+    variants:
+      - prompt_markdown: |
+          Explica por qué funciona un ataque de rogue DHCP sin necesitar "vencer en autoridad" al servidor
+          legítimo, cómo DHCP starvation lo hace más fiable, y qué mitigación estándar existe en switches
+          gestionados.
+

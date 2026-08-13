@@ -1,0 +1,69 @@
+concept_slug: net-08-http-tls
+questions:
+  - type: multiple_choice
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          ¿Cuál de las siguientes frases describe correctamente la relación entre TCP, TLS y HTTP en una
+          conexión HTTPS?
+        options:
+          - "HTTPS es un protocolo completamente distinto de HTTP, que reemplaza tanto a TCP como a HTTP."
+          - "TLS crea la conexión, TCP la protege, y HTTP se ejecuta de forma independiente sobre UDP."
+          - "HTTP cifra sus propios datos internamente, y TLS solo se usa para verificar el certificado del servidor."
+          - "TCP crea la conexión, TLS la protege, y HTTP lleva la conversación web dentro del canal ya cifrado."
+        correct_option_index: 3
+  - type: multiple_choice
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          Capturas con Wireshark el `ClientHello` de un handshake TLS 1.3 hacia un servidor que aloja varios
+          dominios distintos en la misma IP. ¿Qué información sensible puedes leer en texto plano en ese
+          mensaje, sin haber roto ningún cifrado?
+        options:
+          - "La ruta completa de la petición HTTP que se enviará después, incluyendo parámetros."
+          - "Las cookies de sesión que el navegador enviará en la petición HTTP posterior."
+          - "El contenido completo del certificado privado del servidor, incluida su clave privada."
+          - "El nombre de dominio solicitado, mediante la extensión SNI (Server Name Indication), a menos que se use Encrypted Client Hello."
+        correct_option_index: 3
+  - type: true_false
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          Que un sitio web tenga HTTPS con un certificado válido significa que ese sitio es legítimo y seguro
+          de usar.
+        correct_bool: false
+  - type: true_false
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          En la mayoría de conexiones HTTPS, TLS solo autentica al servidor ante el cliente; la autenticación
+          del cliente ante el servidor (mTLS) es opcional y mucho menos común.
+        correct_bool: true
+  - type: free_explanation
+    difficulty: 4
+    evaluation_criteria: |
+      La respuesta debe: (1) explicar qué protege realmente TLS (confidencialidad e integridad del contenido de
+      la conversación de aplicación, y autenticación del servidor mediante el certificado X.509) y distinguirlo
+      de "el sitio es confiable"; (2) enumerar al menos dos metadatos que siguen siendo visibles para un
+      observador de red aun con HTTPS activo (por ejemplo: IP destino, puerto, tamaño/timing de paquetes, SNI
+      sin ECH); (3) explicar por qué esto importa en la práctica, con un ejemplo concreto (fingerprinting de
+      sitio visitado, bloqueo por dominio, o que un sitio de phishing puede tener HTTPS perfectamente válido).
+    expected_answer: |
+      TLS garantiza que el contenido de la conversación de aplicación (la petición y respuesta HTTP completas)
+      viaja cifrado e íntegro entre el cliente y el servidor que presentó el certificado, y que ese certificado
+      fue emitido por una Autoridad Certificadora en la que el cliente confía — es decir, autentica al servidor,
+      no la "seguridad" o legitimidad del contenido que sirve. Un sitio de phishing puede perfectamente tener un
+      certificado TLS válido: TLS protege el canal, no evalúa la intención del operador del sitio. Además, TLS
+      no oculta todo: un observador de red (un ISP, un firewall corporativo, un atacante en la ruta) sigue
+      viendo la IP de destino, el puerto usado, y el tamaño y timing de los paquetes intercambiados, información
+      suficiente para hacer fingerprinting de qué sitio o aplicación se está usando aunque no pueda leer el
+      contenido. Además, sin Encrypted Client Hello (ECH), el nombre de dominio solicitado viaja en texto plano
+      dentro del SNI del ClientHello, porque el servidor necesita saber qué certificado presentar antes de que
+      exista un canal cifrado — esto permite a un observador de red saber exactamente qué dominios visita un
+      usuario, y es la base técnica que usan algunos firewalls corporativos o ISPs para bloquear selectivamente
+      dominios sin necesitar descifrar el tráfico.
+    variants:
+      - prompt_markdown: |
+          ¿Qué protege TLS exactamente y qué NO protege? Menciona al menos dos tipos de información que un
+          observador de red puede seguir viendo aunque el tráfico vaya por HTTPS.
+

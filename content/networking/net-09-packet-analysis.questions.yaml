@@ -1,0 +1,64 @@
+concept_slug: net-09-packet-analysis
+questions:
+  - type: multiple_choice
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          Activas el modo promiscuo en la interfaz de red de tu portátil, conectado a un switch gestionado
+          normal (sin SPAN/mirror configurado). ¿Qué tráfico ajeno adicional podrás capturar respecto a modo
+          normal?
+        options:
+          - "Todo el tráfico de la LAN, porque modo promiscuo obliga al switch a replicar todas las tramas a todos los puertos."
+          - "Solo el tráfico broadcast y multicast de otros hosts, nunca el unicast."
+          - "Todo el tráfico HTTP en texto plano, pero ningún otro protocolo."
+          - "Prácticamente ninguno: el switch solo envía por tu puerto el tráfico dirigido a tu MAC, así que promiscuo no cambia lo que llega físicamente al cable."
+        correct_option_index: 3
+  - type: multiple_choice
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          ¿Cuál es la diferencia principal entre un "capture filter" (BPF) y un "display filter" en Wireshark?
+        options:
+          - "El capture filter se aplica antes de capturar (en el kernel, reduciendo volumen desde el origen); el display filter se aplica después, sobre paquetes ya capturados, con sintaxis más expresiva."
+          - "No hay diferencia real, son dos nombres para el mismo lenguaje de filtrado."
+          - "El capture filter solo funciona en tcpdump; el display filter solo funciona en Wireshark, sin relación entre ambos."
+          - "El display filter reduce el tráfico capturado en disco; el capture filter solo cambia cómo se visualiza lo ya guardado."
+        correct_option_index: 0
+  - type: true_false
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          Ver "TCP Retransmission" repetidamente en una captura de Wireshark es, por sí solo, evidencia
+          suficiente de que hay un ataque o un problema grave en la red.
+        correct_bool: false
+  - type: true_false
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          El modo monitor (RFMON) en Wi-Fi permite capturar tramas de gestión y control 802.11 sin estar
+          asociado a ningún punto de acceso, algo que el modo promiscuo en redes cableadas no ofrece.
+        correct_bool: true
+  - type: free_explanation
+    difficulty: 3
+    evaluation_criteria: |
+      La respuesta debe: (1) mencionar que se necesita que el tráfico ajeno realmente llegue al cable/puerto
+      del analista, algo que un switch normal no hace por diseño; (2) enumerar al menos dos formas legítimas de
+      lograrlo (puerto SPAN/mirror configurado, ARP spoofing para forzar el tráfico a pasar por el atacante, o
+      estar en un hub); (3) explicar que activar modo promiscuo por sí solo no basta sin una de esas condiciones.
+    expected_answer: |
+      En una red moderna con switches, el switch solo envía por cada puerto físico el tráfico dirigido a la MAC
+      conectada a ese puerto — activar modo promiscuo en tu tarjeta de red solo sirve de algo si el tráfico
+      ajeno realmente llega físicamente a tu cable, y por diseño el switch no hace eso. Para capturar tráfico de
+      otros hosts en una red conmutada, hace falta una de estas condiciones: (1) estar conectado a un puerto con
+      SPAN o mirror configurado en el switch, que replica deliberadamente el tráfico de otros puertos hacia el
+      tuyo (una configuración administrativa legítima para monitorización); (2) forzar ese tráfico a pasar por
+      tu equipo mediante ARP spoofing, envenenando las cachés ARP de la víctima y del gateway para que el
+      tráfico se enrute físicamente a través de tu máquina antes de seguir su camino; o (3), mucho menos común
+      hoy, estar en un hub en vez de un switch, donde por diseño el hub retransmite todo a todos los puertos.
+      Sin ninguna de estas condiciones, modo promiscuo por sí solo no capturará tráfico que el switch nunca te
+      esté enviando de por sí.
+    variants:
+      - prompt_markdown: |
+          Estás en una red conmutada (con switch, no hub) y activas modo promiscuo en tu tarjeta de red. ¿Basta
+          eso para capturar el tráfico de otros hosts? Explica qué condiciones adicionales se necesitan.
+

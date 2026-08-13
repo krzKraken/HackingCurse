@@ -1,0 +1,67 @@
+concept_slug: net-06-dns
+questions:
+  - type: multiple_choice
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          En una resolución DNS típica, un resolver recursivo (como 8.8.8.8) consulta sucesivamente a un root
+          server, luego a un servidor TLD, y finalmente al servidor autoritativo del dominio. ¿Cómo se describe
+          este proceso desde el punto de vista del cliente frente al del resolver?
+        options:
+          - "Recursivo para el cliente e iterativo para el resolver: el cliente pide la respuesta final de una sola vez, el resolver hace las consultas paso a paso."
+          - "Iterativo para el cliente y recursivo para el resolver: el cliente hace todas las consultas, el resolver solo entrega la respuesta final."
+          - "Recursivo en ambos casos: tanto el cliente como el resolver reciben siempre la respuesta final sin pasos intermedios."
+          - "Iterativo en ambos casos: tanto el cliente como el resolver deben consultar cada nivel de la jerarquía manualmente."
+        correct_option_index: 0
+  - type: multiple_choice
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          Según RFC 1034, ¿qué ocurre si un nombre ya tiene un registro CNAME configurado y alguien intenta
+          añadir también un registro TXT para ese mismo nombre?
+        options:
+          - "Es válido: CNAME y TXT pueden coexistir sin problema, son tipos de registro independientes."
+          - "Es válido solo si el TXT se configura antes que el CNAME en el servidor autoritativo."
+          - "No es válido, pero solo para registros TXT específicamente; otros tipos como MX sí pueden coexistir con CNAME."
+          - "No es válido: si existe un CNAME para un nombre, ese nombre no puede tener ningún otro tipo de registro."
+        correct_option_index: 3
+  - type: true_false
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          DNS estándar sobre UDP/TCP puerto 53 cifra el contenido de las consultas y respuestas por defecto.
+        correct_bool: false
+  - type: true_false
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          DNS estándar sobre UDP/TCP puerto 53 viaja en texto plano, sin cifrar ni autenticar nada por defecto.
+        correct_bool: true
+  - type: free_explanation
+    difficulty: 4
+    evaluation_criteria: |
+      La respuesta debe: (1) explicar en qué consiste el DNS cache poisoning (inyectar una respuesta falsa que
+      el resolver acepta y cachea como legítima); (2) explicar qué protege DNSSEC (integridad y origen de los
+      registros, mediante firmas criptográficas) y qué NO protege (no cifra el tráfico, no da confidencialidad);
+      (3) distinguir DNSSEC de DoH/DoT, que sí cifran el canal de consulta pero no verifican la autenticidad de
+      los datos igual que DNSSEC; (4) no afirmar que un resolver sin DNSSEC pueda detectar el envenenamiento
+      por sí mismo.
+    expected_answer: |
+      El DNS cache poisoning ocurre cuando un atacante logra que un resolver recursivo acepte y almacene en su
+      caché una respuesta DNS falsa como si fuera legítima, típicamente enviándola antes de que llegue la
+      respuesta real del servidor autoritativo, o explotando debilidades en la generación de identificadores de
+      transacción. Una vez envenenado, el resolver servirá esa respuesta falsa a todos sus clientes hasta que
+      expire el TTL envenenado, sin que el cliente tenga forma de detectarlo por sí mismo. DNSSEC mitiga esto
+      añadiendo firmas criptográficas a los registros DNS, permitiendo que un resolver verifique que una
+      respuesta realmente proviene del servidor autoritativo legítimo y no fue alterada en tránsito — protege
+      integridad y autenticidad del origen, pero explícitamente no cifra el contenido de la consulta ni de la
+      respuesta, así que un observador de red sigue viendo qué dominios se consultan. Esto es distinto de DoH
+      (DNS over HTTPS) y DoT (DNS over TLS), que cifran el canal de comunicación entre cliente y resolver para
+      que un observador de red no pueda ver las consultas, pero no verifican por sí solos que los datos
+      recibidos del resolver sean auténticos — DNSSEC y DoH/DoT resuelven problemas distintos (integridad/origen
+      vs. confidencialidad del canal) y son complementarios, no sustitutos entre sí.
+    variants:
+      - prompt_markdown: |
+          Explica qué es el DNS cache poisoning, qué protege exactamente DNSSEC frente a ese ataque, y en qué
+          se diferencia de lo que aportan DoH/DoT.
+

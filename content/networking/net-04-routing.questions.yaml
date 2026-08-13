@@ -1,0 +1,65 @@
+concept_slug: net-04-routing
+questions:
+  - type: multiple_choice
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          Un paquete IP viaja desde Host A hasta Host B pasando por dos routers intermedios (R1 y R2). ¿Qué
+          ocurre con la dirección IP destino y con la dirección MAC destino a lo largo del recorrido?
+        options:
+          - "Tanto la IP destino como la MAC destino permanecen exactamente iguales en todos los saltos."
+          - "La IP destino cambia en cada salto (se reescribe con la IP del siguiente router); la MAC destino permanece igual."
+          - "La IP destino permanece igual de extremo a extremo; la MAC destino se reescribe en cada salto con la del siguiente salto."
+          - "Tanto la IP destino como la MAC destino se reescriben en cada salto, siguiendo el mismo mecanismo de ARP."
+        correct_option_index: 2
+  - type: multiple_choice
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          Un host tiene en su tabla de rutas una entrada para `10.0.0.0/16` vía Router A y otra para
+          `10.0.5.0/24` vía Router B. Necesita enviar un paquete a `10.0.5.30`. ¿Qué ruta usa y por qué?
+        options:
+          - "La de Router A, porque las rutas /16 siempre tienen mayor prioridad que las /24 en la tabla de rutas."
+          - "La de Router B, por longest prefix match: la ruta /24 es más específica y coincide igual de bien con el destino."
+          - "Ninguna de las dos: al haber dos rutas que coinciden, el host descarta el paquete por ambigüedad de enrutamiento."
+          - "Ambas a la vez: el host envía el paquete duplicado por los dos routers para garantizar entrega."
+        correct_option_index: 1
+  - type: true_false
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          Un router individual conoce, en su tabla de rutas, el camino completo hop-by-hop desde su posición
+          hasta cualquier destino final en Internet.
+        correct_bool: false
+  - type: true_false
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          El gateway y el servidor DNS son configuraciones independientes: un host puede tener el gateway mal
+          configurado y el DNS perfectamente funcional, y aún así no poder salir a Internet.
+        correct_bool: true
+  - type: free_explanation
+    difficulty: 4
+    evaluation_criteria: |
+      La respuesta debe: (1) explicar el mecanismo del campo TTL (Time To Live) en la cabecera IP y cómo cada
+      router lo decrementa en 1; (2) explicar que cuando el TTL llega a 0 el router descarta el paquete y
+      responde con un ICMP "Time Exceeded" hacia el origen, revelando su propia IP; (3) describir cómo
+      traceroute usa TTL crecientes (1, 2, 3...) para reconstruir la ruta completa salto a salto; (4)
+      mencionar que este uso es "reutilizar" un mecanismo que originalmente existía para otro propósito (evitar
+      bucles de enrutamiento infinitos), no diagnóstico.
+    expected_answer: |
+      Traceroute explota el campo TTL (Time To Live) de la cabecera IP, un contador que cada router decrementa
+      en 1 al reenviar un paquete. Si el TTL llega a 0, el router lo descarta y envía de vuelta al origen un
+      mensaje ICMP "Time Exceeded", revelando su propia dirección IP. Traceroute envía una serie de paquetes
+      con TTL creciente: primero TTL=1 (el primer router en el camino lo descarta y responde, revelándose),
+      luego TTL=2 (el segundo router responde), y así sucesivamente hasta que el TTL sea suficiente para llegar
+      al destino final. Cada respuesta ICMP recibida identifica un salto de la ruta, permitiendo reconstruir el
+      camino completo router por router. Es importante notar que el TTL fue diseñado originalmente solo para
+      evitar que un paquete circule indefinidamente en un bucle de enrutamiento (evitando saturar la red con
+      paquetes "zombis"), no como una herramienta de diagnóstico — traceroute es un uso ingenioso pero
+      secundario de ese mecanismo.
+    variants:
+      - prompt_markdown: |
+          Explica cómo `traceroute` reconstruye la ruta completa salto a salto hasta un destino, qué campo de
+          la cabecera IP explota, y para qué fue diseñado originalmente ese mecanismo.
+

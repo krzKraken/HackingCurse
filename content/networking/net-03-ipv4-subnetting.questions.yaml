@@ -1,0 +1,61 @@
+concept_slug: net-03-ipv4-subnetting
+questions:
+  - type: multiple_choice
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          ¿Cuántas direcciones IP son usables para hosts en una red `/24`?
+        options:
+          - "256, porque un /24 tiene 8 bits de host y 2^8 = 256."
+          - "255, porque se resta solo la dirección de broadcast."
+          - "254, porque se restan la dirección de red y la dirección de broadcast."
+          - "253, porque además de red y broadcast se reserva una dirección para el gateway."
+        correct_option_index: 2
+  - type: multiple_choice
+    difficulty: 4
+    variants:
+      - prompt_markdown: |
+          Encuentras un host con IP `172.16.14.201/22`. Un `/22` agrupa el tercer octeto en bloques de 4. ¿Cuál
+          es la dirección de red correcta que contiene a `172.16.14.201`?
+        options:
+          - "172.16.14.0/22"
+          - "172.16.12.0/22"
+          - "172.16.0.0/22"
+          - "172.16.13.0/22"
+        correct_option_index: 1
+  - type: true_false
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          El concepto de "clase C" (del sistema de clases A/B/C anterior a 1993) sigue determinando hoy qué
+          tamaño de red puede tener un rango de direcciones IP determinado.
+        correct_bool: false
+  - type: true_false
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          Muchas organizaciones reutilizan los mismos rangos privados (RFC 1918) en sitios distintos, lo que
+          puede generar conflictos de direccionamiento al interconectarlos, por ejemplo mediante una VPN
+          site-to-site.
+        correct_bool: true
+  - type: free_explanation
+    difficulty: 3
+    evaluation_criteria: |
+      La respuesta debe: (1) explicar qué es el prefijo CIDR (/N) como el punto de corte entre la parte de red
+      y la parte de host de una dirección de 32 bits; (2) mostrar o describir el cálculo de dirección de red
+      mediante AND lógico entre la IP y la máscara; (3) calcular correctamente el rango usable para el ejemplo
+      dado, restando la dirección de red y la de broadcast; (4) no confundir el prefijo con un "tamaño fijo de
+      red" desconectado del corte de bits.
+    expected_answer: |
+      El prefijo /26 en `192.168.1.130/26` indica que los primeros 26 bits de la IP son la parte de red y los
+      6 bits restantes son la parte de host. Con 6 bits de host hay 2^6 = 64 direcciones posibles por subred.
+      Para encontrar la dirección de red se hace un AND lógico entre la IP y la máscara /26 (255.255.255.192):
+      los bloques de 64 en el último octeto son 0, 64, 128 y 192; como 130 cae entre 128 y 191, la dirección de
+      red es 192.168.1.128/26. La dirección de broadcast es la última de ese bloque, 192.168.1.191. El rango
+      usable, restando la dirección de red y la de broadcast, es 192.168.1.129 a 192.168.1.190 (62 hosts
+      usables).
+    variants:
+      - prompt_markdown: |
+          Tienes la IP `192.168.1.130/26`. Explica cómo calcular la dirección de red, la dirección de
+          broadcast y el rango de direcciones usables, mostrando el razonamiento paso a paso.
+

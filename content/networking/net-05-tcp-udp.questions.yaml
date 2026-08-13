@@ -1,0 +1,68 @@
+concept_slug: net-05-tcp-udp
+questions:
+  - type: multiple_choice
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          Durante el three-way handshake de TCP, ¿en qué orden se intercambian los segmentos y qué confirma
+          cada uno?
+        options:
+          - "ACK, SYN, SYN-ACK — el cliente confirma primero, luego negocia parámetros de conexión."
+          - "SYN, SYN-ACK, ACK — el cliente inicia, el servidor acepta y confirma, el cliente confirma la conexión establecida."
+          - "SYN, ACK, SYN-ACK — el cliente inicia, el servidor confirma, y ambos negocian la ventana simultáneamente."
+          - "SYN-ACK, SYN, ACK — el servidor siempre inicia el handshake ofreciendo la conexión al cliente."
+        correct_option_index: 1
+  - type: multiple_choice
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          Nmap envía un SYN a un puerto y recibe un paquete RST como respuesta. ¿Qué puedes inferir sobre el
+          estado de ese puerto?
+        options:
+          - "El puerto está abierto y el servicio rechazó la conexión por política de seguridad."
+          - "El puerto está filtrado por un firewall que descarta el tráfico silenciosamente."
+          - "El puerto está cerrado: no hay ningún servicio escuchando ahí."
+          - "El puerto está abierto pero el servicio detrás está caído momentáneamente."
+        correct_option_index: 2
+  - type: true_false
+    difficulty: 2
+    variants:
+      - prompt_markdown: |
+          UDP no ofrece ninguna garantía de entrega, orden ni fiabilidad a nivel de su propio protocolo, sin
+          importar qué aplicación corra encima.
+        correct_bool: false
+  - type: true_false
+    difficulty: 3
+    variants:
+      - prompt_markdown: |
+          Un puerto "cerrado" responde con RST (información activa de que no hay servicio ahí), mientras que un
+          puerto "filtrado" no responde nada porque el firewall descarta el probe silenciosamente.
+        correct_bool: true
+  - type: free_explanation
+    difficulty: 4
+    evaluation_criteria: |
+      La respuesta debe: (1) explicar que el three-way handshake TCP confirma que ambos extremos pueden
+      recibirse mutuamente (no es solo formalidad, es la base del control de secuencia); (2) explicar
+      explícitamente que el handshake NO autentica la identidad del otro extremo, solo confirma bidireccionalidad
+      de la conexión; (3) distinguir el escenario de IP spoofing ciego (donde el handshake sí ofrece cierta
+      protección porque el atacante no vería el SYN-ACK) de un atacante en posición de interceptar tráfico
+      (MITM), donde el handshake no protege nada.
+    expected_answer: |
+      El three-way handshake de TCP (SYN, SYN-ACK, ACK) establece números de secuencia iniciales y confirma que
+      ambos extremos de la conexión pueden efectivamente enviarse y recibirse tráfico mutuamente — es la base
+      técnica sobre la que TCP construye su fiabilidad (detección de pérdidas, orden, retransmisión). Sin
+      embargo, el handshake no incluye ningún mecanismo de autenticación: no verifica que el otro extremo sea
+      quien dice ser, solo que puede responder a lo que se le envía. Esto ofrece cierta protección contra IP
+      spoofing "ciego": si un atacante falsifica la IP origen de sus paquetes SYN sin poder ver el tráfico de
+      respuesta, nunca recibirá el SYN-ACK del servidor y no podrá completar el handshake con el ACK correcto
+      (porque necesitaría conocer el número de secuencia elegido por el servidor). Pero esta protección
+      desaparece por completo frente a un atacante que sí puede interceptar el tráfico, como en un ataque
+      Man-in-the-Middle (por ejemplo mediante ARP spoofing dentro de una LAN): en ese caso el atacante ve el
+      SYN-ACK real y puede completar el handshake sin problema, haciéndose pasar por cualquiera de los dos
+      extremos.
+    variants:
+      - prompt_markdown: |
+          ¿El three-way handshake de TCP autentica la identidad del otro extremo de la conexión? Explica qué
+          confirma realmente el handshake, y distingue el caso de un atacante que hace IP spoofing ciego del
+          caso de un atacante que puede interceptar el tráfico (MITM).
+
