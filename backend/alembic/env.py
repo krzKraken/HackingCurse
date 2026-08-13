@@ -9,6 +9,7 @@ from app.models import user  # noqa: F401 — registers User with Base.metadata
 from app.models import content  # noqa: F401 — registers content models with Base.metadata
 from app.models import note  # noqa: F401 — registers note models with Base.metadata
 from app.models import question  # noqa: F401 — registers question models with Base.metadata
+from app.models import mastery  # noqa: F401 — registers mastery models with Base.metadata
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
