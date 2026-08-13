@@ -107,6 +107,25 @@ export type DashboardSummary = {
   recent_activity: { concept_slug: string; concept_name: string; outcome: string; answered_at: string }[];
 };
 
+export type LearningSession = {
+  id: string;
+  started_at: string;
+  ended_at: string | null;
+  active_time_sec: number;
+  last_position: string | null;
+  timer_mode: "count_up" | "pomodoro" | "countdown" | "no_timer";
+  pomodoro_preset: string | null;
+  break_reminder_threshold_min: number;
+  hyperfocus_reminder_min: number;
+};
+
+export type Recommendation = {
+  activity_type: "review" | "learn";
+  concept_slug: string;
+  concept_name: string;
+  reason: string;
+};
+
 export const api = {
   login: (username: string, password: string) =>
     request<{ mfa_required: boolean }>("/auth/login", {
@@ -151,4 +170,18 @@ export const api = {
       body: JSON.stringify({ outcome }),
     }),
   getDashboardSummary: () => request<DashboardSummary>("/dashboard/summary"),
+  startFocusSession: () => request<LearningSession>("/focus/sessions", { method: "POST" }),
+  getCurrentFocusSession: () => request<LearningSession>("/focus/sessions/current"),
+  updateFocusSession: (
+    id: string,
+    patch: Partial<{
+      active_time_sec: number;
+      last_position: string;
+      timer_mode: string;
+      pomodoro_preset: string;
+    }>
+  ) => request<LearningSession>(`/focus/sessions/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  endFocusSession: (id: string) => request<LearningSession>(`/focus/sessions/${id}/end`, { method: "POST" }),
+  getRecommendation: (minutes?: number) =>
+    request<Recommendation | undefined>(`/focus/recommendation${minutes ? `?minutes=${minutes}` : ""}`),
 };
