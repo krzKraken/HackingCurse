@@ -33,21 +33,21 @@
 - [x] Página `/notes` + editor standalone `/notes/:id`
 
 ### Banco de preguntas (mínimo) + Motor de retención + Repaso
-- [ ] Modelos Question/QuestionVariant/Answer (multiple_choice, true_false, free_explanation)
-- [ ] Preguntas reales para NET-01 a NET-10 (agente cybersecurity-instructor)
-- [ ] ConceptMastery + ReviewSchedule (curva de olvido, stability S)
-- [ ] Difficulty engine (rolling accuracy window)
-- [ ] ReviewSelector: modo general
-- [ ] ReviewSelector: modo debilidades
-- [ ] ReviewSelector: modo olvidado
-- [ ] ReviewSelector: modo por tema
-- [ ] ReviewSelector: modo mixto
-- [ ] ReviewSelector: modo sorpresa
-- [ ] ReviewSelector: modo antes-de-laboratorio (sin labs reales aún, solo prerequisitos)
-- [ ] Flujo de pregunta: mostrar → intento → confidence check → evaluar → explicación → registrar
-- [ ] Auto-evaluación guiada para `free_explanation` (mostrar criterios/respuesta modelo tras el intento)
-- [ ] Frontend: botón "Repasar ahora" + selector de modo/cantidad
-- [ ] Verificación end-to-end
+- [x] Modelos Question/QuestionVariant (multiple_choice, true_false, free_explanation — sin tablas separadas Answer/Evaluation, ver spec §0)
+- [x] Preguntas reales para NET-01 a NET-10 (agente cybersecurity-instructor, 50 preguntas)
+- [x] ConceptMastery + ReviewSchedule (curva de olvido, stability S)
+- [x] Difficulty engine (rolling accuracy window)
+- [x] ReviewSelector: modo general
+- [x] ReviewSelector: modo debilidades
+- [x] ReviewSelector: modo olvidado
+- [x] ReviewSelector: modo por tema
+- [x] ReviewSelector: modo mixto
+- [x] ReviewSelector: modo sorpresa
+- [x] ReviewSelector: modo antes-de-laboratorio (sin labs reales aún, solo prerequisitos por concept_slugs)
+- [x] Flujo de pregunta: mostrar → confidence check → intento → evaluar → explicación → registrar
+- [x] Auto-evaluación guiada para `free_explanation` (mostrar criterios/respuesta modelo tras el intento)
+- [x] Frontend: página `/review` con selector de modo/cantidad
+- [x] Verificación end-to-end (API + navegador)
 
 **Pendiente para más adelante (fuera de este sub-plan, dejar registrado):**
 - [ ] Modo de repaso "errores personales" (depende de `ErrorPattern`, módulo `errors/`)
