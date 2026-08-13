@@ -126,6 +126,26 @@ export type Recommendation = {
   reason: string;
 };
 
+export type Laboratory = {
+  id: string;
+  title: string;
+  type: string;
+  difficulty: string;
+  duration_estimate_min: number;
+  concept_slugs: string[];
+};
+
+export type LabInstance = {
+  id: string;
+  laboratory_id: string;
+  status: "requested" | "provisioning" | "running" | "stopped" | "destroyed" | "expired" | "failed";
+  host_port: number | null;
+  hints_used: number;
+  solved: boolean;
+  requested_at: string;
+  started_at: string | null;
+};
+
 export const api = {
   login: (username: string, password: string) =>
     request<{ mfa_required: boolean }>("/auth/login", {
@@ -184,4 +204,19 @@ export const api = {
   endFocusSession: (id: string) => request<LearningSession>(`/focus/sessions/${id}/end`, { method: "POST" }),
   getRecommendation: (minutes?: number) =>
     request<Recommendation | undefined>(`/focus/recommendation${minutes ? `?minutes=${minutes}` : ""}`),
+  listLabs: () => request<Laboratory[]>("/labs"),
+  createLabInstance: (laboratoryId: string) =>
+    request<LabInstance>(`/labs/${laboratoryId}/instances`, { method: "POST" }),
+  getLabInstance: (instanceId: string) => request<LabInstance>(`/labs/instances/${instanceId}`),
+  resetLabInstance: (instanceId: string) =>
+    request<LabInstance>(`/labs/instances/${instanceId}/reset`, { method: "POST" }),
+  destroyLabInstance: (instanceId: string) =>
+    request<LabInstance>(`/labs/instances/${instanceId}/destroy`, { method: "POST" }),
+  getLabHint: (instanceId: string, level: number) =>
+    request<{ level: number; text: string }>(`/labs/instances/${instanceId}/hints/${level}`),
+  submitLabFlag: (instanceId: string, flag: string) =>
+    request<{ correct: boolean; solved: boolean }>(`/labs/instances/${instanceId}/submit`, {
+      method: "POST",
+      body: JSON.stringify({ flag }),
+    }),
 };

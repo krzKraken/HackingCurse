@@ -11,6 +11,8 @@ import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { FocusSessionProvider } from "./features/focus/useFocusSession";
 import { FocusWidgets } from "./features/focus/FocusWidgets";
 import { RecommendationButton } from "./features/focus/RecommendationButton";
+import { LabsPage } from "./features/labs/LabsPage";
+import { LabInstancePage } from "./features/labs/LabInstancePage";
 
 function Home() {
   return <h1>Dashboard (placeholder)</h1>;
@@ -42,6 +44,8 @@ export function App() {
                 <Route path="/notes/:id" element={<NoteDetailPage />} />
                 <Route path="/review" element={<ReviewPage />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/labs" element={<LabsPage />} />
+                <Route path="/labs/:labId" element={<LabInstancePage />} />
               </Route>
             </Route>
           </Routes>
