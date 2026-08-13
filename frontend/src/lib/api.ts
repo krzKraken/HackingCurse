@@ -92,6 +92,21 @@ export type AnswerResult = {
   expected_answer?: string;
 };
 
+export type DashboardSummary = {
+  global_mastery: number;
+  domains: {
+    slug: string;
+    name: string;
+    mastery_percent: number;
+    studied_count: number;
+    total_count: number;
+  }[];
+  reviews_due_count: number;
+  weak_concepts: { slug: string; name: string; mastery_score: number }[];
+  overdue_concepts: { slug: string; name: string; next_due_at: string }[];
+  recent_activity: { concept_slug: string; concept_name: string; outcome: string; answered_at: string }[];
+};
+
 export const api = {
   login: (username: string, password: string) =>
     request<{ mfa_required: boolean }>("/auth/login", {
@@ -135,4 +150,5 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ outcome }),
     }),
+  getDashboardSummary: () => request<DashboardSummary>("/dashboard/summary"),
 };

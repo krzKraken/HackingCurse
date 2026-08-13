@@ -7,6 +7,7 @@ import { LessonPage } from "./features/lessons/LessonPage";
 import { NotesPage } from "./features/notes/NotesPage";
 import { NoteDetailPage } from "./features/notes/NoteDetailPage";
 import { ReviewPage } from "./features/reviews/ReviewPage";
+import { DashboardPage } from "./features/dashboard/DashboardPage";
 
 function Home() {
   return <h1>Dashboard (placeholder)</h1>;
@@ -25,6 +26,7 @@ export function App() {
             <Route path="/notes" element={<NotesPage />} />
             <Route path="/notes/:id" element={<NoteDetailPage />} />
             <Route path="/review" element={<ReviewPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
           </Route>
         </Routes>
       </AuthProvider>
