@@ -1,0 +1,20 @@
+id: net-tcp-flagbox-001
+title: "FlagBox"
+type: black_box
+difficulty: beginner
+duration_estimate_min: 30
+concept_slugs: [net-05-tcp-udp, net-09-packet-analysis]
+docker_build_context: labs/flagbox
+cpu_limit: "0.5"
+memory_limit_mb: 128
+max_lifetime_min: 120
+cleanup_remove_volumes: true
+hints:
+  - level: 1
+    text: "Conéctate al servicio con netcat y observa el banner. ¿Qué comandos acepta?"
+  - level: 2
+    text: "Captura el tráfico con Wireshark mientras interactúas — es texto plano por línea."
+  - level: 3
+    text: "Prueba el comando GET con distintos IDs. ¿El servicio valida que el ID te pertenece?"
+  - level: 4
+    text: "GET 0 es el registro más antiguo del sistema — ¿de quién podría ser?"
