@@ -1,0 +1,115 @@
+domain: { slug: "networking", name: "Networking" }
+topic: { slug: "protocols", name: "Protocolos" }
+concept: { slug: "net-07-dhcp", name: "DHCP" }
+lesson:
+  concepto: |
+    DHCP (Dynamic Host Configuration Protocol, RFC 2131) es el protocolo que asigna automáticamente
+    direccionamiento IP y configuración de red a un dispositivo cuando se conecta a una LAN: IP, máscara
+    de subred, gateway por defecto y servidores DNS, sin que un humano tenga que configurarlo a mano en
+    cada equipo. Es la razón por la que enchufas un cable o te unes a un Wi-Fi y "simplemente funciona".
+
+  como_funciona: |
+    DHCP opera sobre UDP: el servidor escucha en el puerto 67, el cliente en el puerto 68 (heredados de
+    BOOTP, el protocolo predecesor del que DHCP evolucionó). El proceso completo se conoce como **DORA**:
+
+    1. **Discover**: el cliente, sin IP todavía, envía un broadcast (origen `0.0.0.0`, destino
+       `255.255.255.255`) preguntando "¿hay algún servidor DHCP aquí?".
+    2. **Offer**: cada servidor DHCP que escucha responde ofreciendo una IP disponible de su pool, junto
+       con el resto de parámetros (máscara, gateway, DNS, duración del lease).
+    3. **Request**: el cliente elige una oferta (normalmente la primera que recibe) y la solicita
+       formalmente, también por broadcast — esto es importante: broadcast, no unicast a ese servidor
+       concreto, precisamente para que **todos** los demás servidores DHCP que ofrecieron sepan que su
+       oferta no fue aceptada y liberen esa IP de vuelta a su pool.
+    4. **Acknowledge**: el servidor elegido confirma la asignación con un ACK, y el cliente ya puede usar
+       esa configuración.
+
+    Cada asignación tiene un **lease** (tiempo de validez). Antes de que expire, el cliente intenta
+    renovarlo directamente con el servidor original (unicast, sin repetir todo el DORA) al 50% del
+    tiempo de lease transcurrido; si no lo consigue, reintenta en modo broadcast más cerca del 87.5% del
+    lease. Si el lease expira sin renovación, el cliente pierde la IP y debe empezar un DORA completo de
+    nuevo.
+
+    Igual que ARP, DHCP no tiene autenticación nativa: **cualquier dispositivo en la LAN puede anunciarse
+    como servidor DHCP** y responder a Discovers ajenos. No hay ningún mecanismo estándar que verifique
+    que un servidor DHCP es "el legítimo" — la única defensa práctica vive en la infraestructura de red
+    (switches), no en el protocolo mismo.
+
+  por_que_importa: |
+    DHCP es, junto con ARP, el otro pilar de los ataques "desde dentro de la LAN": si controlas el
+    servidor DHCP que responde primero (o el único), controlas qué gateway y qué DNS usa cada nuevo
+    dispositivo que se conecta — control total sobre su tráfico saliente sin necesitar tocar su
+    configuración directamente.
+
+  visualizacion: |
+    ```
+    Cliente (sin IP)                                    Servidor DHCP (10.0.0.1)
+        │── Discover (broadcast) ───────────────────────►│
+        │◄─ Offer: "te ofrezco 10.0.0.50" ────────────────│
+        │── Request (broadcast: "acepto 10.0.0.50") ─────►│  ← todos los servidores DHCP lo ven
+        │◄─ Ack: "confirmado, lease 24h" ───────────────────│
+        │
+        │  al 50% del lease (12h) → renovación directa (unicast) con el servidor original
+        │  si falla → reintento en broadcast cerca del 87.5% del lease
+    ```
+
+  ejemplo: |
+    Trivial: al conectar un portátil a una red nueva, `dhclient` o el gestor de red del sistema operativo
+    ejecuta el DORA completo automáticamente en segundo plano — puedes verlo con `sudo tcpdump -i eth0
+    port 67 or port 68` mientras conectas el cable.
+
+    Avanzado: en una red con dos servidores DHCP simultáneos (uno legítimo y uno "rogue" no autorizado,
+    sea por error de configuración o por ataque), el cliente aceptará la **primera** oferta que le llegue
+    — que puede perfectamente no ser la del servidor legítimo si el rogue responde más rápido (por
+    ejemplo, por estar en el mismo segmento físico sin saltos intermedios, o simplemente por carga menor).
+    Esto explica por qué un "rogue DHCP" no necesita vencer al servidor legítimo en autoridad, solo en
+    velocidad de respuesta.
+
+  comandos: |
+    ```bash
+    sudo dhclient -v eth0            # forzar solicitud DHCP con salida detallada (Linux)
+    ip addr show eth0                  # verificar la IP asignada tras el DORA
+    sudo tcpdump -i eth0 port 67 or port 68     # observar el intercambio DORA en vivo
+    ```
+
+  errores_frecuentes: |
+    - Asumir que DHCP y DNS son el mismo servicio o dependen uno del otro directamente. DHCP puede
+      *entregarte* la IP de un servidor DNS como parte de su configuración, pero son protocolos y
+      procesos completamente independientes con puertos y funciones distintas.
+    - Pensar que un lease expirado deja al equipo sin red inmediatamente. La mayoría de sistemas
+      mantienen la última configuración conocida funcionando hasta que un renovación o un nuevo DORA
+      fallan explícitamente — el corte no siempre es instantáneo al segundo exacto del vencimiento.
+    - Nivel intermedio: no entender por qué el mensaje Request va en broadcast en vez de unicast al
+      servidor elegido. Es fácil asumir "ya elegí, hablo directo con él", pero el broadcast es necesario
+      precisamente para notificar (indirectamente) a los demás servidores DHCP que su oferta fue
+      rechazada, para que liberen esa IP reservada temporalmente.
+    - Confiar en que "solo hay un servidor DHCP en mi red" sin verificarlo. En redes corporativas grandes,
+      un router doméstico mal configurado conectado por error a un puerto de switch puede empezar a
+      responder Discovers y causar conflictos de IP intermitentes y muy difíciles de diagnosticar si no
+      se sospecha de un DHCP no autorizado desde el principio.
+
+  regla_mental: |
+    El primero en responder gana, no el legítimo — DHCP confía en quien llega antes, no en quien debería.
+
+  perspectiva_ofensiva: |
+    Rogue DHCP: montar un servidor DHCP no autorizado en la LAN para entregar tu propia IP como gateway
+    y/o DNS a nuevas víctimas, logrando Man-in-the-Middle persistente sin necesitar reenvenenar ARP
+    continuamente. DHCP starvation: agotar el pool de direcciones del servidor legítimo enviando
+    Discovers masivos con MACs falsificadas distintas, forzando que nuevos clientes no puedan obtener IP
+    del servidor real y sean más receptivos a aceptar un rogue DHCP que sí responde. Ángulo avanzado:
+    combinar DHCP starvation con un rogue DHCP es más fiable que solo levantar un servidor rogue paralelo,
+    porque elimina la carrera de "quién responde primero" contra el servidor legítimo.
+
+  perspectiva_defensiva: |
+    DHCP Snooping en switches gestionados es la mitigación estándar: el switch clasifica sus puertos como
+    "trusted" (donde se permite tráfico de servidor DHCP, típicamente el puerto hacia el servidor
+    legítimo o el uplink) y "untrusted" (puertos de usuario, donde se descartan paquetes DHCP Offer/Ack
+    que no deberían originarse ahí). Esto también alimenta la tabla de bindings que usa Dynamic ARP
+    Inspection (ver NET-02) para validar respuestas ARP — ambas defensas están conectadas: DHCP Snooping
+    genera la fuente de verdad (qué IP corresponde a qué MAC en qué puerto) que DAI usa después para
+    detectar ARP spoofing. Ángulo avanzado: sin DHCP Snooping, ninguna defensa de ARP basada en bindings
+    tiene datos fiables de los que partir — por eso ambos controles casi siempre se despliegan juntos, no
+    por separado.
+
+relationships:
+  - { type: prerequisite, target_slug: "net-02-ethernet-mac-arp" }
+  - { type: prerequisite, target_slug: "net-03-ipv4-subnetting" }

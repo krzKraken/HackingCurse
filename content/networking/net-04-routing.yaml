@@ -1,0 +1,120 @@
+domain: { slug: "networking", name: "Networking" }
+topic: { slug: "addressing-routing", name: "Direccionamiento y Routing" }
+concept: { slug: "net-04-routing", name: "Routing" }
+lesson:
+  concepto: |
+    Routing (enrutamiento) es el proceso de decidir por dónde debe salir un paquete IP para llegar a un
+    destino que no está en la misma red local. Mientras ARP resuelve "quién es este vecino directo",
+    routing resuelve un problema distinto: "mi destino no es vecino directo, ¿a qué siguiente salto le
+    entrego este paquete para que se acerque a su destino final?".
+
+    Un router es un dispositivo (o un host con esa función habilitada) que conecta dos o más redes
+    distintas y reenvía paquetes entre ellas basándose en su dirección IP destino. El gateway
+    (puerta de enlace) es, desde el punto de vista de un host normal, el router al que le entrega
+    cualquier paquete cuyo destino no está en su propia subred.
+
+  como_funciona: |
+    Cada host y cada router mantiene una tabla de rutas: una lista de pares (red destino, siguiente
+    salto). Cuando un host tiene que enviar un paquete, compara la IP destino contra cada entrada de su
+    tabla y elige la ruta **más específica que coincida** (longest prefix match: entre una entrada
+    `/24` y una `/16` que ambas cubran el destino, gana la `/24` por ser más específica). Si ninguna
+    ruta específica coincide, usa la ruta por defecto (`0.0.0.0/0`), que normalmente apunta al gateway.
+
+    El enrutamiento es salto a salto (hop-by-hop): ningún router conoce la ruta completa hasta el
+    destino, solo decide "el siguiente salto correcto desde donde estoy". Esto es fundamentalmente
+    distinto de un circuito telefónico tradicional (donde se reserva una ruta completa de antemano) — en
+    IP cada router toma su propia decisión local, paquete a paquete, y esas decisiones pueden cambiar en
+    el tiempo si la topología cambia.
+
+    En cada salto ocurre algo importante a nivel de capas: la cabecera IP (capa 3) **no cambia** — la IP
+    origen y destino siguen siendo las mismas de extremo a extremo — pero la cabecera Ethernet (capa 2)
+    **se reescribe en cada salto**: la MAC origen pasa a ser la del router que reenvía, y la MAC destino
+    pasa a ser la del siguiente salto (resuelta vía ARP local a cada router). Es la razón por la que,
+    como viste en NET-01/NET-02, la MAC destino en tu propia LAN nunca es la del servidor remoto: es la
+    de tu gateway, y así sucesivamente en cada salto hasta llegar al destino.
+
+    Las tablas de rutas se pueblan de dos formas: **estáticas** (un administrador las escribe a mano) o
+    **dinámicas**, vía protocolos de enrutamiento (OSPF, BGP, RIP) que los routers usan entre sí para
+    anunciarse rutas automáticamente y adaptarse a cambios de topología o fallos de enlace — fuera del
+    alcance de esta lección introductoria, pero es lo que sostiene Internet a gran escala (BGP conecta
+    las redes autónomas de todo el mundo).
+
+  por_que_importa: |
+    Entender routing te permite razonar sobre qué tráfico puede llegar a dónde en una red segmentada, un
+    prerequisito directo para pivoting (moverte de una red comprometida a otra a través de un host que
+    actúa de puente) y para interpretar `traceroute` durante reconocimiento externo.
+
+  visualizacion: |
+    ```
+    Host A                    Router R1                   Router R2                  Host B
+    10.0.1.50/24               10.0.1.1 / 10.0.2.1          10.0.2.2 / 10.0.3.1        10.0.3.80/24
+        │                          │                            │                          │
+        │ IP dst=10.0.3.80         │ IP dst=10.0.3.80           │ IP dst=10.0.3.80          │
+        │ MAC dst=R1               │ MAC dst=R2                 │ MAC dst=B                 │
+        └──────────────────────────►                            │                          │
+                                    └────────────────────────────►                          │
+                                                                  └──────────────────────────►
+        (la IP destino NUNCA cambia; la MAC destino cambia en cada salto)
+    ```
+
+  ejemplo: |
+    Trivial: `ip route get 8.8.8.8` te muestra por qué interfaz y a través de qué gateway saldría un
+    paquete dirigido a esa IP, sin enviarlo realmente — útil para depurar rutas sin generar tráfico.
+
+    Avanzado: `traceroute` (o `tracert` en Windows) revela la ruta salto a salto explotando el campo TTL
+    (Time To Live) de la cabecera IP: envía paquetes con TTL=1, TTL=2, TTL=3... Cada router que recibe un
+    paquete decrementa el TTL en 1; si llega a 0, lo descarta y responde con un ICMP "Time Exceeded" al
+    origen, revelando su propia IP. Repitiendo esto con TTL creciente, `traceroute` reconstruye la ruta
+    completa router por router — un uso ingenioso de un mecanismo diseñado originalmente solo para evitar
+    bucles infinitos de enrutamiento, no para diagnóstico.
+
+  comandos: |
+    ```bash
+    ip route show                  # tabla de rutas del host
+    ip route get 8.8.8.8            # qué ruta y gateway usaría para llegar a esa IP
+    traceroute 8.8.8.8                # ruta salto a salto hasta el destino
+    mtr 8.8.8.8                        # traceroute continuo + estadísticas de pérdida/latencia por salto
+    ```
+
+  errores_frecuentes: |
+    - Creer que un router "conoce" la ruta completa hasta cualquier destino. Solo conoce el siguiente
+      salto correcto para cada red que tiene en su tabla — el enrutamiento es una decisión local y
+      distribuida, no un mapa global consultado de antemano.
+    - Confundir gateway con DNS. Son configuraciones independientes: el gateway decide por dónde sale el
+      tráfico, el DNS resuelve nombres a IPs. Un host puede tener el gateway mal configurado y el DNS
+      perfecto, y aún así no poder salir a Internet.
+    - Nivel intermedio: asumir que la ruta "más corta" en saltos es siempre la elegida. La tabla de rutas
+      elige por longest prefix match y por métrica configurada, no necesariamente por el camino
+      físicamente más corto — dos rutas pueden coexistir hacia el mismo destino con distinta prioridad
+      (métrica), y una ruta estática mal puesta puede ganarle a una dinámica más eficiente.
+    - No distinguir entre "no hay ruta" (el paquete nunca sale, error inmediato tipo "Network
+      unreachable") y "hay ruta pero el destino no responde" (timeout) — son fallos en capas y momentos
+      distintos del recorrido, y confundirlos lleva a diagnosticar mal problemas de conectividad.
+
+  regla_mental: |
+    El router nunca sabe el camino completo, solo el siguiente paso correcto — la IP destino viaja
+    intacta de extremo a extremo, pero la MAC destino cambia en cada salto.
+
+  perspectiva_ofensiva: |
+    En pivoting, un host comprometido con dos interfaces de red (una en la red externa comprometida y
+    otra en una red interna a la que el atacante no tiene acceso directo) actúa exactamente como un
+    router: reenvía tráfico entre ambas redes. Herramientas como `chisel`, `ligolo-ng` o el port
+    forwarding de SSH (`ssh -D`, proxychains) simulan este comportamiento a nivel de aplicación sin
+    necesitar privilegios de administrador de red real. Ángulo avanzado: en redes mal segmentadas, un
+    `traceroute` desde un punto externo puede revelar direccionamiento interno (IPs RFC 1918 aparecen en
+    respuestas ICMP de routers intermedios), filtrando información de topología que debería quedar
+    oculta detrás del perímetro.
+
+  perspectiva_defensiva: |
+    ACLs en routers y firewalls stateful son el control natural para limitar qué tráfico puede cruzar de
+    una subred a otra — es la extensión directa de la segmentación vista en NET-03. Ángulo avanzado:
+    filtrar o limitar respuestas ICMP "Time Exceeded" y "Destination Unreachable" en el perímetro reduce
+    la información que un atacante externo puede extraer vía traceroute sobre la topología interna, sin
+    romper el enrutamiento legítimo (que no depende de esas respuestas para funcionar, solo el
+    diagnóstico las necesita) — un ejemplo claro de cómo un mismo mecanismo (ICMP) sirve tanto para
+    operación normal como para reconocimiento, y hay que decidir conscientemente cuánto exponer.
+
+relationships:
+  - { type: prerequisite, target_slug: "net-03-ipv4-subnetting" }
+  - { type: related, target_slug: "net-02-ethernet-mac-arp" }
+  - { type: continues_with, target_slug: "net-05-tcp-udp" }

@@ -1,0 +1,124 @@
+domain: { slug: "networking", name: "Networking" }
+topic: { slug: "addressing-routing", name: "Direccionamiento y Routing" }
+concept: { slug: "net-02-ethernet-mac-arp", name: "Ethernet, MAC y ARP" }
+lesson:
+  concepto: |
+    Ethernet es el protocolo que define cómo los dispositivos dentro de un mismo segmento físico
+    (una LAN) empaquetan y entregan datos entre sí. Cada interfaz de red tiene una dirección MAC
+    (Media Access Control), un identificador de 48 bits, único por fabricante y por tarjeta, grabado
+    (en teoría) de fábrica. Mientras que la IP identifica "en qué red lógica estás", la MAC identifica
+    "qué tarjeta física eres" dentro del segmento local.
+
+    ARP (Address Resolution Protocol) es el protocolo que traduce IP a MAC dentro de una LAN: cuando tu
+    equipo sabe la IP de destino pero necesita meter esos datos en una trama Ethernet, necesita también
+    la MAC del destino (o del siguiente salto). ARP resuelve exactamente esa pregunta: "¿quién tiene esta
+    IP? dime tu MAC".
+
+  como_funciona: |
+    Una MAC tiene 48 bits, se escribe en hexadecimal como 6 pares de octetos (`aa:bb:cc:dd:ee:ff`). Los
+    primeros 24 bits son el OUI (Organizationally Unique Identifier), asignado por el IEEE a cada
+    fabricante — por eso puedes a menudo identificar el fabricante de una tarjeta de red solo mirando los
+    tres primeros bytes de su MAC. Los últimos 24 bits los asigna el fabricante y en teoría son únicos por
+    dispositivo, aunque las MAC son software-modificables (MAC spoofing) y muchos sistemas modernos
+    aleatorizan la MAC en redes Wi-Fi por privacidad.
+
+    Una trama Ethernet lleva: MAC destino (6 bytes), MAC origen (6 bytes), EtherType (2 bytes, indica qué
+    protocolo va dentro — 0x0800 para IPv4, 0x0806 para ARP, 0x86DD para IPv6), el payload, y al final un
+    FCS (Frame Check Sequence) para detectar errores de transmisión. Ethernet no garantiza entrega ni
+    orden — eso es trabajo de capas superiores.
+
+    El protocolo ARP (RFC 826) funciona con dos mensajes:
+
+    1. **ARP Request** (broadcast): "¿Quién tiene la IP 192.168.1.1? Dile a 192.168.1.50 (aa:bb:cc:...)".
+       Se envía a la MAC de broadcast `ff:ff:ff:ff:ff:ff`, así que **todos** los hosts de la LAN la reciben.
+    2. **ARP Reply** (unicast): el host que tiene esa IP responde directamente al solicitante: "192.168.1.1
+       está en cc:dd:ee:ff:aa:bb".
+
+    Cada host mantiene una caché ARP (tabla IP↔MAC) para no tener que preguntar en cada paquete. Esa
+    caché tiene un timeout (varía por SO, típicamente 60s-20min) y, crucialmente, en la mayoría de
+    implementaciones **acepta respuestas ARP no solicitadas** (gratuitous ARP) sin verificar que
+    correspondan a una petición previa. Este detalle de diseño — ARP no tiene autenticación ni verificación
+    de origen — es la raíz de todos los ataques de ARP spoofing.
+
+  por_que_importa: |
+    ARP es, junto con DHCP, el protocolo más explotado dentro de una LAN porque confía ciegamente en
+    cualquier respuesta que reciba. Entender su mecanismo es prerequisito obligatorio para hacer o
+    detectar Man-in-the-Middle en redes locales, para interpretar capturas de tráfico, y para entender
+    por qué ciertos ataques (ARP spoofing, DHCP spoofing) solo son posibles "desde dentro" de la LAN.
+
+  visualizacion: |
+    ```
+    Host A (192.168.1.50)                          Host B (192.168.1.1)
+    quiere hablar con B pero solo sabe su IP
+
+    1) ARP Request (broadcast, MAC dest = ff:ff:ff:ff:ff:ff)
+       A ──────────────────────────────────────────────► TODOS en la LAN
+       "¿Quién tiene 192.168.1.1? Soy 192.168.1.50 (MAC aa:aa:aa:aa:aa:aa)"
+
+    2) ARP Reply (unicast, solo responde el dueño de la IP)
+       B ──────────────────────────────────────────────► A
+       "192.168.1.1 está en MAC bb:bb:bb:bb:bb:bb"
+
+    3) A guarda en su caché: 192.168.1.1 → bb:bb:bb:bb:bb:bb
+       A ya puede construir tramas Ethernet dirigidas directamente a B
+    ```
+
+  ejemplo: |
+    Trivial: en tu propia máquina, `ping 192.168.1.1` desde cero (caché ARP vacía) dispara internamente
+    un ARP Request antes de que salga siquiera el primer paquete ICMP — puedes verlo con `arp -a` cambiando
+    de vacío a poblado, o directamente en una captura de Wireshark con filtro `arp`.
+
+    Avanzado: en una auditoría interna, ejecutas `arp-scan` o `netdiscover` para descubrir todos los hosts
+    vivos de la LAN sin necesidad de tener rango IP previo — basta con lanzar ARP requests a todo el
+    espacio de direcciones del segmento local y recoger quién responde. Es más rápido y sigiloso que un
+    escaneo ICMP porque muchos firewalls de host bloquean ping pero no pueden bloquear ARP sin dejar de
+    funcionar en la LAN.
+
+  comandos: |
+    ```bash
+    ip neigh show          # tabla ARP en Linux moderno (equivalente a `arp -a`)
+    arp -a                  # tabla ARP, forma clásica
+    arping 192.168.1.1        # enviar ARP requests directamente a una IP
+    arp-scan --localnet        # descubrir todos los hosts vivos en la LAN vía ARP
+    ip link show eth0            # ver la MAC de tu propia interfaz
+    ```
+
+  errores_frecuentes: |
+    - Pensar que la MAC es un identificador global fiable. Es fácil de falsificar por software
+      (`ip link set eth0 address aa:bb:cc:dd:ee:ff`) y los sistemas modernos la aleatorizan por defecto
+      en Wi-Fi — no sirve para identificación persistente de un dispositivo a través del tiempo.
+    - Confundir el alcance de ARP: solo funciona dentro del mismo segmento de capa 2 (broadcast domain).
+      Un router **no** reenvía ARP requests entre redes — por eso, si el destino está fuera de tu LAN, tu
+      equipo resuelve la MAC de tu gateway, no la del destino final (ver NET-01, ejemplo avanzado).
+    - Nivel intermedio: asumir que la caché ARP se actualiza solo con respuestas a peticiones propias. En
+      realidad, un host puede enviar una respuesta ARP no solicitada (gratuitous ARP) y muchas pilas de
+      red la aceptan igual, sobrescribiendo la entrada — este es exactamente el mecanismo de ARP spoofing,
+      no un "bug", sino un comportamiento por diseño que rara vez se valida.
+
+  regla_mental: |
+    IP = dónde quiero llegar. MAC = a quién se lo entrego ahora.
+
+  perspectiva_ofensiva: |
+    ARP spoofing (o ARP poisoning): el atacante envía respuestas ARP falsas y no solicitadas diciendo
+    "yo soy el gateway" (o "yo soy la víctima"), envenenando las cachés ARP de ambas partes para que todo
+    el tráfico pase por el atacante — Man-in-the-Middle clásico dentro de una LAN. Herramientas como
+    `arpspoof`, `bettercap` o `ettercap` automatizan esto. Ángulo más avanzado: en redes con switches que
+    implementan Dynamic ARP Inspection (DAI) o Port Security, el spoofing directo falla, pero sigue siendo
+    posible en redes sin esas protecciones (la mayoría de LANs domésticas y muchas corporativas mal
+    configuradas), y algunos entornos permiten "MAC flooding" del switch como vector alternativo para
+    forzar modo hub y capturar tráfico sin ni siquiera envenenar ARP.
+
+  perspectiva_defensiva: |
+    Defensas básicas: entradas ARP estáticas en hosts críticos (poco escalable), y herramientas de
+    detección de spoofing (`arpwatch`, `arpon`) que alertan cuando una IP cambia de MAC sin explicación.
+    Defensa real a nivel de infraestructura: Dynamic ARP Inspection (DAI) en switches gestionados, que
+    valida cada paquete ARP contra una tabla de bindings DHCP conocida y descarta los que no cuadran; y
+    Port Security, que limita cuántas MACs distintas puede anunciar un puerto físico del switch, mitigando
+    también MAC flooding. Ángulo avanzado: en redes segmentadas por VLAN, ARP spoofing solo afecta al
+    broadcast domain local — la segmentación de red es, indirectamente, una mitigación estructural contra
+    este tipo de ataques, aunque no los elimina dentro de cada VLAN.
+
+relationships:
+  - { type: prerequisite, target_slug: "net-01-fundamentals" }
+  - { type: continues_with, target_slug: "net-04-routing" }
+  - { type: continues_with, target_slug: "net-07-dhcp" }

@@ -1,0 +1,153 @@
+domain: { slug: "networking", name: "Networking" }
+topic: { slug: "protocols", name: "Protocolos" }
+concept: { slug: "net-08-http-tls", name: "HTTP y TLS" }
+lesson:
+  concepto: |
+    HTTP (HyperText Transfer Protocol) es el protocolo de aplicación que estructura las conversaciones
+    entre clientes (navegadores, apps, scripts) y servidores web: peticiones con un método, una ruta y
+    cabeceras, y respuestas con un código de estado, cabeceras y un cuerpo. TLS (Transport Layer
+    Security) es una capa independiente que se coloca **debajo** de HTTP y **encima** de TCP, y que
+    añade cifrado, integridad y autenticación del servidor (y opcionalmente del cliente) al canal —
+    HTTPS no es "otro protocolo", es HTTP corriendo dentro de una conexión TLS.
+
+    La frase que resume la relación entre las tres capas que ya conoces: TCP crea la conexión, TLS la
+    protege, HTTP lleva la conversación web.
+
+  como_funciona: |
+    **HTTP** es un protocolo de texto plano, sin estado por diseño (cada petición es independiente; el
+    estado como sesiones de login se simula con cookies, ver lecciones de Web Security). Una petición
+    típica:
+
+    ```
+    GET /index.html HTTP/1.1
+    Host: ejemplo.com
+    User-Agent: Mozilla/5.0
+    Accept: text/html
+
+    ```
+
+    Y una respuesta:
+
+    ```
+    HTTP/1.1 200 OK
+    Content-Type: text/html
+    Content-Length: 1256
+
+    <html>...</html>
+    ```
+
+    Los códigos de estado se agrupan por familia: 1xx informativo, 2xx éxito (200 OK), 3xx redirección
+    (301 permanente, 302 temporal), 4xx error del cliente (401 no autenticado, 403 prohibido, 404 no
+    encontrado), 5xx error del servidor (500 error interno, 502 bad gateway). HTTP/1.1 introdujo
+    conexiones persistentes (keep-alive, reutilizar la misma conexión TCP para varias peticiones en vez
+    de abrir una nueva por cada recurso); HTTP/2 multiplexa varias peticiones sobre una sola conexión con
+    framing binario; HTTP/3 abandona TCP y corre sobre QUIC (sobre UDP) para evitar head-of-line blocking
+    a nivel de transporte.
+
+    **TLS** (sucesor de SSL, que ya no debe usarse — está roto) se negocia con un handshake que, en su
+    versión actual TLS 1.3, requiere solo **1 round-trip** (frente a 2 en TLS 1.2, una optimización
+    directa de latencia):
+
+    ```
+    Cliente                                    Servidor
+       │── ClientHello (cifrados soportados,     │
+       │   key share) ──────────────────────────►│
+       │◄─ ServerHello + certificado + Finished ──│  (servidor ya puede empezar a cifrar datos de app)
+       │── Finished ──────────────────────────────►│  (cliente confirma, canal cifrado bidireccional listo)
+    ```
+
+    Durante el handshake, el servidor presenta un **certificado X.509** que vincula su clave pública con
+    su identidad (el dominio), firmado por una Autoridad Certificadora (CA) en la que el cliente confía
+    de antemano (su lista de CAs raíz viene preinstalada en el sistema operativo o el navegador). El
+    cliente verifica esa cadena de confianza antes de continuar — es la base de la autenticación del
+    servidor: no evita que alguien intercepte el tráfico, evita que ese alguien pueda hacerse pasar
+    convincentemente por el servidor real sin que el cliente lo note.
+
+    Tras el handshake, ambas partes derivan claves de sesión simétricas (mucho más rápidas que la
+    criptografía asimétrica usada en el handshake) con las que se cifra todo el tráfico de aplicación
+    real — incluyendo la petición HTTP completa, cabeceras y todo.
+
+  por_que_importa: |
+    HTTP y TLS son, combinados, el protocolo más usado del planeta (HTTPS) y por tanto el objetivo con
+    mayor superficie de ataque en Web Security completa. Entender dónde termina TLS y empieza HTTP es la
+    base para distinguir ataques de red (interceptar/manipular el canal) de ataques de aplicación
+    (manipular la lógica de la petición/respuesta una vez descifrada).
+
+  visualizacion: |
+    ```
+    ┌─────────────────────────────────────┐
+    │ HTTP  (petición/respuesta, texto)     │  ← capa de aplicación, lo que "dice" la conversación
+    ├─────────────────────────────────────┤
+    │ TLS   (cifrado + autenticación)        │  ← protege el contenido, no cambia el "qué dice"
+    ├─────────────────────────────────────┤
+    │ TCP   (conexión fiable, puertos)        │  ← garantiza que llega completo y ordenado
+    ├─────────────────────────────────────┤
+    │ IP    (enrutamiento)                     │  ← lleva los bytes al host correcto
+    └─────────────────────────────────────┘
+    ```
+
+  ejemplo: |
+    Trivial: `curl -v https://ejemplo.com` muestra en la salida `-v` tanto el handshake TLS (versión
+    negociada, cifrado elegido, certificado presentado) como la petición y respuesta HTTP por separado —
+    dejando ver claramente que son dos capas distintas trabajando juntas.
+
+    Avanzado: en una captura de Wireshark de tráfico HTTPS, puedes ver el `ClientHello` en texto plano
+    (incluye el nombre del dominio solicitado vía **SNI**, Server Name Indication — necesario porque un
+    mismo servidor puede alojar muchos dominios distintos con certificados distintos en la misma IP, y el
+    servidor necesita saber cuál certificado presentar *antes* de que exista un canal cifrado). Esto
+    significa que, aunque el contenido de la petición HTTP va cifrado, el nombre de dominio visitado es
+    visible en texto plano en el SNI para cualquiera que observe el tráfico — a menos que se use
+    Encrypted Client Hello (ECH), una extensión más reciente que cifra también el SNI.
+
+  comandos: |
+    ```bash
+    curl -v https://ejemplo.com                       # ver handshake TLS + petición/respuesta HTTP
+    openssl s_client -connect ejemplo.com:443 -servername ejemplo.com   # inspeccionar certificado y cifrado negociado
+    openssl x509 -in cert.pem -noout -text              # detalle completo de un certificado
+    curl -I https://ejemplo.com                            # solo cabeceras de respuesta (método HEAD)
+    ```
+
+  errores_frecuentes: |
+    - Pensar que HTTPS "cifra todo" incluyendo metadatos de red. La IP destino, el puerto, el tamaño y
+      timing de los paquetes, y (sin ECH) el SNI siguen siendo visibles para un observador de red —
+      TLS cifra el contenido de la conversación de aplicación, no la existencia ni el destino de la
+      conexión.
+    - Confundir "tiene candado/HTTPS" con "es seguro" o "es legítimo". TLS garantiza que el tráfico va
+      cifrado hacia el servidor que presentó ese certificado — no garantiza que ese servidor sea
+      confiable, ni que la aplicación detrás no tenga vulnerabilidades. Un sitio de phishing puede tener
+      HTTPS perfectamente válido.
+    - Nivel intermedio: asumir que un certificado válido significa que la cadena de confianza fue
+      verificada correctamente por el cliente. Aplicaciones mal implementadas (curl con `-k`, código con
+      validación de certificados deshabilitada "para pruebas" que llega a producción) aceptan
+      certificados inválidos o auto-firmados sin avisar, anulando silenciosamente la protección de TLS.
+    - No distinguir entre autenticación del servidor (estándar, siempre presente en TLS normal) y
+      autenticación del cliente (mTLS, mutual TLS, opcional y mucho menos común) — la mayoría de HTTPS
+      solo autentica al servidor ante el cliente, no al revés.
+
+  regla_mental: |
+    TCP crea la conexión. TLS la protege. HTTP lleva la conversación web.
+
+  perspectiva_ofensiva: |
+    Interceptar tráfico HTTPS requiere romper la cadena de confianza de alguna forma: instalar un
+    certificado CA propio en el dispositivo víctima (viable en entornos donde el atacante controla el
+    dispositivo, como pruebas autorizadas con proxy tipo Burp Suite), o explotar una implementación que
+    no valida certificados correctamente. Ángulo avanzado: incluso sin romper TLS, el SNI en texto plano
+    del ClientHello permite a un atacante en la ruta de red (o un ISP, o un firewall corporativo) saber
+    qué dominios visita un usuario sin descifrar nada — suficiente para fingerprinting de comportamiento
+    o para bloqueo selectivo por dominio, y es la razón técnica detrás de por qué ECH genera tanto interés
+    tanto en privacidad como en evasión de controles de red corporativos.
+
+  perspectiva_defensiva: |
+    HSTS (HTTP Strict Transport Security) obliga al navegador a usar siempre HTTPS con un dominio tras la
+    primera visita exitosa, mitigando ataques de downgrade que intentan forzar una conexión HTTP sin
+    cifrar. Certificate pinning (fijar qué certificado o CA específica se espera, en vez de confiar en
+    cualquier CA del sistema) reduce el riesgo de una CA comprometida o de un certificado fraudulento
+    aceptado por error, a costa de complejidad operativa al rotar certificados. Ángulo avanzado: Certificate
+    Transparency (logs públicos, append-only, de todos los certificados emitidos por CAs participantes)
+    permite detectar certificados fraudulentos emitidos para tu dominio sin tu conocimiento, monitorizando
+    esos logs activamente — una defensa detectiva, no preventiva, pero crítica cuando la prevención falla.
+
+relationships:
+  - { type: prerequisite, target_slug: "net-05-tcp-udp" }
+  - { type: related, target_slug: "net-06-dns" }
+  - { type: continues_with, target_slug: "net-09-packet-analysis" }

@@ -1,0 +1,135 @@
+domain: { slug: "networking", name: "Networking" }
+topic: { slug: "protocols", name: "Protocolos" }
+concept: { slug: "net-06-dns", name: "DNS" }
+lesson:
+  concepto: |
+    DNS (Domain Name System) es el sistema que traduce nombres legibles por humanos (`ejemplo.com`) a
+    direcciones IP que las máquinas necesitan para enrutar tráfico. Es, en esencia, una base de datos
+    distribuida y jerárquica: nadie tiene la respuesta completa para todos los dominios del mundo, pero
+    cualquier resolver puede encontrar la respuesta correcta siguiendo la jerarquía paso a paso.
+
+    Opera principalmente sobre UDP puerto 53 (por su ligereza, para consultas típicas que caben en un
+    solo datagrama) y cae a TCP puerto 53 cuando la respuesta es demasiado grande para un datagrama UDP
+    o para transferencias de zona completas entre servidores.
+
+  como_funciona: |
+    La jerarquía DNS es un árbol invertido: en la raíz están los root servers (13 clusters lógicos,
+    identificados de la A a la M, replicados vía anycast en cientos de ubicaciones físicas reales). Bajo
+    la raíz están los TLD (Top-Level Domain: `.com`, `.org`, `.es`), y bajo cada TLD, los servidores
+    autoritativos de cada dominio concreto.
+
+    Una resolución típica (cuando el resolver del cliente no tiene nada en caché) es **recursiva** desde
+    el punto de vista del cliente (le pide al resolver "dame la IP final, no me hagas trabajar a mí") pero
+    **iterativa** desde el punto de vista del resolver hacia el resto del sistema:
+
+    ```
+    Cliente → Resolver (ej. 8.8.8.8 o el de tu ISP)
+      Resolver → Root server:        "¿dónde están los servidores de .com?"
+      Root      → Resolver:           "pregúntale a estos TLD servers de .com"
+      Resolver → TLD server (.com):  "¿dónde están los servidores de ejemplo.com?"
+      TLD       → Resolver:           "pregúntale a ns1.ejemplo.com (autoritativo)"
+      Resolver → Servidor autoritativo: "¿cuál es la IP de ejemplo.com?"
+      Autoritativo → Resolver:         "93.184.216.34"
+    Resolver → Cliente: "93.184.216.34"
+    ```
+
+    Cada respuesta lleva un TTL (Time To Live, en segundos) que le dice al resolver cuánto tiempo puede
+    cachear esa respuesta antes de volver a preguntar — un trade-off entre frescura de datos (TTL bajo,
+    cambios se propagan rápido) y carga en los servidores autoritativos (TTL alto, menos consultas).
+
+    Tipos de registro relevantes: **A** (nombre → IPv4), **AAAA** (nombre → IPv6), **CNAME** (alias, un
+    nombre apunta a otro nombre, no a una IP directamente), **MX** (servidor de correo del dominio), **NS**
+    (qué servidores son autoritativos para esta zona), **TXT** (texto libre, usado para SPF/DKIM/DMARC y
+    verificación de propiedad de dominio), **PTR** (resolución inversa, IP → nombre, vive en la zona
+    especial `in-addr.arpa`).
+
+    DNS estándar (sobre UDP/TCP puerto 53) no cifra ni autentica nada — viaja en texto plano y cualquiera
+    en la ruta puede leerlo o falsificar una respuesta si logra que llegue antes que la legítima (cache
+    poisoning). DNSSEC añade firmas criptográficas a los registros para garantizar integridad y origen
+    (no confidencialidad); DoH (DNS over HTTPS) y DoT (DNS over TLS) añaden cifrado del canal de consulta
+    entre cliente y resolver, evitando que un observador de red vea qué dominios estás resolviendo.
+
+  por_que_importa: |
+    DNS es, junto con ARP y DHCP, uno de los tres protocolos "de confianza implícita" que la mayoría de
+    redes no valida suficientemente — y por eso es un vector constante tanto de reconocimiento
+    (enumeración de subdominios revela infraestructura) como de ataque (DNS spoofing, tunneling para
+    exfiltración de datos evadiendo firewalls que solo inspeccionan HTTP/HTTPS).
+
+  visualizacion: |
+    ```
+                    . (raíz)
+                    │
+          ┌─────────┼─────────┐
+        .com       .org       .es          ← TLD servers
+          │
+      ejemplo.com                          ← servidor autoritativo de la zona
+          │
+    ┌─────┼─────┐
+    A     MX     NS                        ← registros dentro de la zona
+    93.184...  mail.ejemplo.com   ns1.ejemplo.com
+    ```
+
+  ejemplo: |
+    Trivial: `dig ejemplo.com` muestra la resolución completa: pregunta enviada, respuesta recibida,
+    TTL, y qué servidor respondió.
+
+    Avanzado: `dig +trace ejemplo.com` fuerza una resolución iterativa completa desde la raíz, mostrando
+    cada salto de la jerarquía en vez de confiar en el resolver recursivo — imprescindible para
+    diagnosticar por qué un dominio resuelve mal en algunas redes y en otras no (delegaciones NS rotas,
+    TTLs de caché desincronizados entre resolvers, o un servidor autoritativo que responde distinto según
+    la ubicación geográfica del que pregunta — GeoDNS, usado legítimamente por CDNs, pero indistinguible
+    a primera vista de una respuesta envenenada sin este tipo de análisis).
+
+  comandos: |
+    ```bash
+    dig ejemplo.com                    # consulta DNS estándar con detalle completo
+    dig ejemplo.com MX                    # tipo de registro específico
+    dig +trace ejemplo.com                  # resolución iterativa completa desde la raíz
+    dig -x 93.184.216.34                       # resolución inversa (PTR)
+    nslookup ejemplo.com                          # alternativa más simple, multiplataforma
+    host ejemplo.com                                # salida mínima, útil en scripts
+    ```
+
+  errores_frecuentes: |
+    - Pensar que un CNAME puede coexistir con otros registros del mismo nombre (ej. un CNAME y un TXT
+      para el mismo host). Por especificación (RFC 1034), si existe un CNAME para un nombre, ese nombre
+      no puede tener ningún otro tipo de registro — es una restricción de diseño frecuentemente violada
+      por herramientas mal configuradas, y causa de fallos de resolución difíciles de diagnosticar.
+    - Confundir el TTL del registro con el tiempo real que tardará en propagarse un cambio. El TTL
+      define cuánto tiempo *pueden* cachear los resolvers, pero un resolver puede ignorarlo o un cliente
+      puede tener su propia caché local con otra política — "esperar el TTL" no garantiza que todos vean
+      el cambio a la vez.
+    - Nivel intermedio: asumir que DNS siempre "sabe la verdad". Un resolver recursivo público (8.8.8.8,
+      1.1.1.1) responde lo que su caché o la cadena de autoridad le diga — si un atacante logra un cache
+      poisoning exitoso, el resolver servirá una respuesta falsa a todos sus clientes hasta que expire el
+      TTL envenenado, sin que haya forma de detectarlo desde el lado del cliente sin DNSSEC.
+
+  regla_mental: |
+    DNS no tiene una respuesta, tiene un camino hacia ella — y nadie en ese camino garantiza por defecto
+    que no te mienta.
+
+  perspectiva_ofensiva: |
+    Enumeración de subdominios (fuerza bruta contra registros A/CNAME, transferencias de zona mal
+    configuradas con `dig axfr`, búsqueda en certificados TLS vía Certificate Transparency logs) es de
+    los primeros pasos de reconocimiento pasivo y activo en cualquier pentest externo — revela
+    infraestructura que no aparece en el sitio web principal (paneles de administración, entornos de
+    staging, servicios internos mal expuestos). Ángulo avanzado: DNS tunneling abusa de que la mayoría de
+    firewalls corporativos permiten salida DNS sin inspección profunda — se codifican datos arbitrarios
+    dentro de subdominios de consultas (`datoexfiltrado.atacante.com`) para exfiltrar información o
+    mantener un canal de comando y control que evade controles perimetrales centrados en HTTP/HTTPS.
+
+  perspectiva_defensiva: |
+    DNSSEC firma criptográficamente las respuestas para que un resolver pueda verificar que no fueron
+    alteradas en tránsito — mitiga cache poisoning pero no cifra el tráfico (sigue siendo observable).
+    Restringir transferencias de zona (AXFR) solo a servidores secundarios autorizados evita filtrar el
+    mapa completo de una infraestructura de un solo golpe. Ángulo avanzado: monitorizar patrones de
+    consultas DNS anómalas (volumen alto de subdominios únicos hacia un mismo dominio, longitudes de
+    consulta atípicamente largas, consultas TXT frecuentes hacia dominios desconocidos) es una de las
+    formas más efectivas de detectar DNS tunneling activo, porque el tráfico HTTP/HTTPS de exfiltración
+    suele estar bien camuflado, pero el patrón de consultas DNS anómalo es más difícil de ocultar sin
+    reducir drásticamente el ancho de banda del canal encubierto.
+
+relationships:
+  - { type: prerequisite, target_slug: "net-05-tcp-udp" }
+  - { type: related, target_slug: "net-04-routing" }
+  - { type: continues_with, target_slug: "net-09-packet-analysis" }

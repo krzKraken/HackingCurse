@@ -1,0 +1,135 @@
+domain: { slug: "networking", name: "Networking" }
+topic: { slug: "fundamentals", name: "Fundamentos" }
+concept: { slug: "net-01-fundamentals", name: "Fundamentos de Redes" }
+lesson:
+  concepto: |
+    Una red es, en su forma más simple, dos o más dispositivos que pueden intercambiar datos entre sí.
+    Todo lo demás — routers, switches, protocolos, direcciones IP — existe únicamente para resolver un
+    problema: cómo llevar un mensaje desde un origen hasta un destino de forma fiable, cuando origen y
+    destino no están conectados por un solo cable.
+
+    Un host es cualquier dispositivo con una identidad en la red (una IP): tu portátil, un servidor, una
+    cámara IP, un router. Una interfaz de red (`eth0`, `wlan0`, `en0`) es el punto de conexión física o
+    lógica de un host a un medio de transmisión (cable, radio). Un host puede tener varias interfaces —
+    y por tanto varias direcciones — a la vez.
+
+    Una LAN (Local Area Network) es un conjunto de hosts que comparten el mismo segmento físico o lógico
+    y pueden hablarse directamente sin pasar por un router. Cuando el destino está fuera de esa LAN, hace
+    falta enrutamiento — tema de lecciones posteriores.
+
+  como_funciona: |
+    Ningún protocolo hace todo el trabajo solo. Las redes se diseñan en capas: cada capa resuelve un
+    problema concreto y le entrega el resultado a la capa siguiente sin saber cómo lo hizo. Esto es
+    encapsulación: cada capa añade su propia cabecera (header) a los datos de la capa superior, como
+    sobres dentro de sobres.
+
+    El modelo teórico de referencia es OSI (7 capas), pero lo que corre en Internet de verdad es el
+    modelo TCP/IP (4 capas), más simple:
+
+    ```
+    OSI (7 capas)          TCP/IP (4 capas)        Qué resuelve                  Ejemplos
+    ─────────────────      ─────────────────        ────────────────────────      ──────────────
+    7 Aplicación     ┐
+    6 Presentación   ├──►  4 Aplicación             formato de los datos          HTTP, DNS, SSH
+    5 Sesión         ┘                              que le importan al usuario
+    4 Transporte     ──►   3 Transporte              entrega extremo a extremo,    TCP, UDP
+                                                      puertos, fiabilidad
+    3 Red            ──►   2 Internet                enrutamiento entre redes,      IP, ICMP
+                                                      direccionamiento lógico
+    2 Enlace de datos ┐
+    1 Física          ┴──► 1 Acceso a red             entrega dentro del mismo       Ethernet, Wi-Fi,
+                                                       segmento físico, direcc. MAC   ARP
+    ```
+
+    Cuando envías un paquete, cada capa de tu equipo añade su cabecera de arriba hacia abajo (encapsula);
+    el receptor la quita de abajo hacia arriba (desencapsula). Un mismo byte de datos de aplicación viaja
+    envuelto en cabecera TCP, dentro de cabecera IP, dentro de trama Ethernet, dentro de señales
+    eléctricas u ópticas o radio.
+
+    Por qué importa esta separación en la práctica: cada capa tiene su propio espacio de direccionamiento
+    y su propio tipo de ataque. Una MAC (capa 2) sólo tiene sentido dentro del segmento local; una IP
+    (capa 3) tiene sentido a través de routers; un puerto (capa 4) identifica un servicio dentro de un
+    host. Confundir en qué capa vive un problema es la causa más común de diagnósticos de red
+    equivocados — y de análisis de tráfico mal interpretados.
+
+  por_que_importa: |
+    Casi todo lo que se hace en pentesting de red parte de saber en qué capa está ocurriendo algo: un
+    ataque de ARP spoofing vive en capa 2, un escaneo de puertos en capa 4, una inyección SQL en capa 7.
+    Si no tienes claro el modelo de capas, no puedes razonar sobre qué herramienta usar, qué tráfico vas
+    a ver en una captura, ni por qué un firewall bloquea algo en una capa y no en otra.
+
+  visualizacion: |
+    ```
+    Emisor                                                   Receptor
+    ┌─────────────┐                                         ┌─────────────┐
+    │ Aplicación   │  "GET /index.html"                     │ Aplicación   │
+    ├─────────────┤  ┌──────────────────────┐               ├─────────────┤
+    │ Transporte   │  │TCP│ "GET /index.html"│               │ Transporte   │
+    ├─────────────┤  ┌───┬──────────────────────┐            ├─────────────┤
+    │ Internet     │  │IP │TCP│ "GET /index.html"│            │ Internet     │
+    ├─────────────┤  ┌────┬───┬──────────────────────┐        ├─────────────┤
+    │ Acceso a red │  │Eth │IP │TCP│ "GET /index.html"│        │ Acceso a red │
+    └─────────────┘  └────┴───┴──────────────────────┘        └─────────────┘
+           │                    cable / aire                          │
+           └────────────────────────────────────────────────────────►│
+                     (des-encapsula de abajo hacia arriba)
+    ```
+
+  ejemplo: |
+    Trivial: cuando abres `https://ejemplo.com`, tu navegador (capa 4 aplicación) genera una petición
+    HTTP; el sistema operativo la mete en un segmento TCP (capa transporte) con puertos origen/destino;
+    ese segmento se mete en un paquete IP (capa internet) con la IP de tu equipo y la del servidor; y
+    ese paquete se mete en una trama Ethernet o Wi-Fi (capa acceso a red) con la MAC de tu equipo y la
+    del siguiente salto (normalmente tu router, no el servidor final).
+
+    Avanzado: si capturas ese mismo tráfico con Wireshark, verás que la MAC destino de la trama nunca es
+    la del servidor real (a menos que esté en tu misma LAN) — es la MAC de tu gateway. La IP destino sí
+    es la del servidor real. Este desajuste (MAC local, IP remota) es la prueba práctica de que capa 2 y
+    capa 3 resuelven problemas distintos: capa 2 solo entrega "al siguiente salto", capa 3 sabe el
+    destino final.
+
+  comandos: |
+    ```bash
+    ip addr show          # interfaces de red y sus direcciones (Linux moderno)
+    ifconfig               # equivalente clásico, deprecado en muchas distros
+    ip link show            # interfaces a nivel de capa de enlace (estado, MAC)
+    ip route show             # tabla de rutas del host
+    ```
+
+  errores_frecuentes: |
+    - Pensar que "red" significa siempre Internet. Una red puede ser dos laptops conectadas por cable
+      cruzado, sin salir jamás a Internet.
+    - Confundir el modelo OSI (7 capas, académico, útil para hablar con precisión) con lo que realmente
+      implementan los sistemas operativos (TCP/IP, 4 capas). Los libros de certificación mezclan ambos
+      y generan confusión sobre "en qué capa" vive algo como ARP (vive en capa 2 de TCP/IP, pero se suele
+      ubicar en capa 3 de OSI por lo que resuelve — este tipo de matices generan debates que no vale la
+      pena memorizar, entender el flujo de datos importa más que la etiqueta exacta).
+    - Creer que cada capa "sabe" de las demás. No es así: TCP no sabe que va sobre Ethernet, y Ethernet
+      no sabe que lleva TCP dentro. Esa ignorancia mutua es intencional (abstracción) y es lo que permite
+      que la misma IP funcione sobre Wi-Fi, fibra o 4G indistintamente.
+    - Nivel intermedio: asumir que una interfaz de red = una IP. Un host puede tener varias IPs en una
+      misma interfaz (IP aliasing), o ninguna (interfaz en modo monitor, usada en auditoría Wi-Fi).
+
+  regla_mental: |
+    Cada capa resuelve un problema y no sabe cómo resolvieron el suyo las demás: la tuya es solo pasar
+    el sobre.
+
+  perspectiva_ofensiva: |
+    Reconocer en qué capa opera cada herramienta te dice qué visibilidad y qué limitaciones tiene. Nmap
+    trabaja principalmente en capas 3-4 (no ve contenido de aplicación sin scripts NSE); Wireshark puede
+    inspeccionar las cuatro capas a la vez, lo cual lo hace la herramienta de diagnóstico más completa.
+    Un atacante en la misma LAN que la víctima tiene acceso a capa 2 (puede hacer ARP spoofing, envenenar
+    tablas MAC); un atacante remoto normalmente solo llega a capa 3 en adelante — este único hecho explica
+    por qué ciertos ataques (ARP spoofing, VLAN hopping) son exclusivos de "estar dentro" de la red.
+
+  perspectiva_defensiva: |
+    La segmentación en capas es también una superficie de defensa: puedes filtrar en capa 2 (port
+    security, control de acceso por MAC), en capa 3 (ACLs de router, firewalls stateless), en capa 4
+    (firewalls con estado, que solo dejan pasar tráfico de conexiones ya establecidas) o en capa 7 (WAF,
+    proxies que inspeccionan contenido HTTP). Defender solo en una capa y asumir que cubre las demás es
+    un error común: un firewall de capa 3/4 no detiene un XSS, porque el ataque vive en capa 7 y el
+    tráfico es "legítimo" desde el punto de vista de capas inferiores.
+
+relationships:
+  - { type: continues_with, target_slug: "net-02-ethernet-mac-arp" }
+  - { type: continues_with, target_slug: "net-03-ipv4-subnetting" }

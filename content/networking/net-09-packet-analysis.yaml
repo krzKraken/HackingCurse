@@ -1,0 +1,136 @@
+domain: { slug: "networking", name: "Networking" }
+topic: { slug: "tools", name: "Herramientas de Análisis" }
+concept: { slug: "net-09-packet-analysis", name: "Análisis de Paquetes (Wireshark/tcpdump)" }
+lesson:
+  concepto: |
+    Analizar paquetes es capturar el tráfico real que circula por una interfaz de red y examinarlo
+    campo por campo — no confiar en lo que una aplicación *dice* que está haciendo, sino ver directamente
+    qué bytes salen y entran del cable o del aire. Es la herramienta que convierte todo lo aprendido en
+    NET-01 a NET-08 (capas, ARP, TCP, DNS, TLS) de teoría a algo verificable byte a byte.
+
+    `tcpdump` es una herramienta de línea de comandos para capturar y filtrar tráfico en tiempo real o
+    guardarlo a disco. Wireshark es su equivalente con interfaz gráfica, mucho más potente para inspección
+    profunda, reconstrucción de sesiones y decodificación de cientos de protocolos. Ambas se apoyan sobre
+    la misma base: **libpcap** (o Npcap en Windows), la librería que habla directamente con el driver de
+    la tarjeta de red para entregar copias de cada trama antes de que el sistema operativo la procese
+    normalmente.
+
+  como_funciona: |
+    Por defecto, una tarjeta de red solo entrega al sistema operativo las tramas dirigidas a su propia
+    MAC (o a broadcast/multicast relevante) — descarta en hardware/driver todo lo demás sin molestar a la
+    CPU. Para capturar tráfico ajeno en una red cableada, la interfaz debe activar **modo promiscuo**:
+    acepta y entrega todas las tramas que llegan al cable, sin importar la MAC destino. En redes Wi-Fi el
+    equivalente es **modo monitor** (RFMON), que además permite capturar tramas de gestión y control
+    802.11 sin estar asociado a ningún punto de acceso — es un modo distinto y más profundo que
+    promiscuo, exclusivo de interfaces inalámbricas.
+
+    Importante y a menudo malentendido: activar modo promiscuo no te da acceso mágico a todo el tráfico
+    de la LAN. En una red con switches (la inmensa mayoría hoy), el switch solo envía por cada puerto
+    físico el tráfico dirigido a esa MAC — modo promiscuo solo sirve de algo si el tráfico realmente
+    *llega* a tu cable, lo cual requiere estar en un puerto con **SPAN/mirror** configurado, en un hub
+    (raro hoy), o haber forzado ese tráfico a pasar por ti (ver ARP spoofing, NET-02).
+
+    `tcpdump` y Wireshark usan dos lenguajes de filtro distintos y complementarios:
+
+    - **Capture filters** (BPF, Berkeley Packet Filter): se aplican *antes* de que el paquete suba del
+      kernel al programa — el kernel compila la expresión a bytecode BPF y descarta lo que no coincide
+      sin copiarlo al espacio de usuario. Es lo que usa `tcpdump` por defecto (`tcpdump port 53`) y lo
+      que Wireshark llama "capture filter". Es eficiente porque reduce el volumen capturado desde el
+      origen, pero su sintaxis es limitada (protocolo, dirección, puerto — poco más).
+    - **Display filters**: exclusivos de Wireshark, se aplican *después* de capturar todo, sobre los
+      paquetes ya en memoria/disco. Su sintaxis es mucho más expresiva (`http.request.method == "POST"`,
+      `tcp.flags.syn == 1 && tcp.flags.ack == 0`, `dns.qry.name contains "exfil"`) porque Wireshark ya
+      decodificó cada campo de cada protocolo y puedes filtrar por cualquiera de ellos.
+
+    Wireshark también reconstruye conversaciones completas: "Follow TCP Stream" reensambla todos los
+    segmentos de una conexión TCP en el orden correcto (usando los números de secuencia de NET-05) y te
+    muestra el flujo de datos de aplicación completo como si fuera una sola pieza — indispensable para
+    leer una sesión HTTP o un intercambio de texto plano completo en vez de segmento a segmento.
+
+  por_que_importa: |
+    Todo lo que enseñan NET-01 a NET-08 es verificable — y a menudo solo se entiende de verdad — mirando
+    una captura real. El análisis de paquetes es también la habilidad central de la respuesta a
+    incidentes (forense de red) y de mucho del reconocimiento ofensivo: sin poder leer tráfico crudo, un
+    analista solo puede confiar en lo que las herramientas de más alto nivel le reportan, sin poder
+    verificarlo independientemente.
+
+  visualizacion: |
+    ```
+    NIC en modo normal:      solo sube al SO tráfico dirigido a mi MAC/broadcast
+    NIC en modo promiscuo:    sube TODO lo que llega físicamente al cable
+
+    Captura (BPF, en el kernel)          Display filter (en Wireshark, ya decodificado)
+    ┌─────────────────┐                 ┌──────────────────────────────┐
+    │ port 53          │  ──────────►    │ http.request.method == "GET"   │
+    │ (reduce volumen   │  guarda .pcap   │ (filtra sobre lo ya capturado,  │
+    │  antes de tocar    │                │  no reduce carga de captura)     │
+    │  disco/memoria)      │                └──────────────────────────────┘
+    └─────────────────┘
+    ```
+
+  ejemplo: |
+    Trivial: `tcpdump -i eth0 -n port 80` captura y muestra en vivo solo tráfico HTTP, con IPs en
+    numérico (`-n`, sin resolver DNS, evitando generar tráfico DNS adicional que contamine la propia
+    captura).
+
+    Avanzado: en un pcap de una red mal segmentada, filtras `http.request or ftp or telnet` en Wireshark
+    y usas "Follow TCP Stream" sobre cualquier resultado — si alguno de esos protocolos en texto plano
+    lleva autenticación, las credenciales aparecen literalmente en el flujo reconstruido. Este es el
+    ejercicio clásico que demuestra por qué protocolos sin cifrado nunca deberían llevar credenciales
+    reales en una red compartida, y por qué HTTPS/SFTP/SSH no son "mejoras opcionales" sino mitigaciones
+    directas contra exactamente este escenario.
+
+  comandos: |
+    ```bash
+    tcpdump -i eth0 -n port 53                    # captura filtrada en vivo, sin resolución DNS
+    tcpdump -i eth0 -w captura.pcap                  # guardar captura completa a disco
+    tcpdump -r captura.pcap -n 'tcp and port 443'     # leer un pcap ya guardado, con capture filter
+    wireshark captura.pcap                              # abrir en interfaz gráfica para análisis profundo
+    tshark -i eth0 -Y 'dns.qry.name contains "exfil"'      # Wireshark en modo terminal con display filter
+    ```
+
+  errores_frecuentes: |
+    - Confundir capture filter con display filter y escribir sintaxis de uno en el campo del otro (son
+      lenguajes distintos: BPF vs el lenguaje propio de Wireshark) — la causa más común de "el filtro no
+      funciona" en principiantes.
+    - Capturar en la interfaz equivocada (ej. `eth0` cuando el tráfico relevante va por una VPN en
+      `tun0`, o por una interfaz virtual de un contenedor/VM) y concluir erróneamente que "no hay
+      tráfico" cuando en realidad se está mirando el punto de observación incorrecto.
+    - Asumir que modo promiscuo en una red conmutada (switch) basta para ver tráfico ajeno. Sin SPAN/
+      mirror port, ARP spoofing, o estar literalmente en el camino del tráfico, promiscuo no capturará
+      nada que el switch no te esté enviando ya de por sí.
+    - Nivel intermedio: interpretar "TCP Retransmission" o "TCP Dup ACK" en Wireshark como síntomas de un
+      ataque o un fallo grave sin más contexto. Son mecanismos normales de recuperación ante pérdida de
+      paquetes (ver NET-05) — frecuentes en redes con algo de pérdida real (Wi-Fi congestionado, enlaces
+      saturados) y no necesariamente indicio de nada malicioso; hay que correlacionar con volumen y
+      patrón, no reaccionar a una sola ocurrencia.
+
+  regla_mental: |
+    Si no lo ves en el cable, no lo sabes con certeza — todo lo demás es lo que otra capa te dice que
+    pasó.
+
+  perspectiva_ofensiva: |
+    Sniffing pasivo de tráfico en texto plano (HTTP, FTP, Telnet, SNMP con community strings por
+    defecto) sigue siendo sorprendentemente productivo en redes internas mal segmentadas — combinado con
+    ARP spoofing (NET-02) para forzar tráfico ajeno hacia el atacante en redes conmutadas. Ángulo
+    avanzado: incluso tráfico cifrado (TLS) filtra metadatos útiles sin descifrar nada — tamaños y timing
+    de paquetes pueden usarse para fingerprinting de sitio visitado o de aplicación (traffic analysis /
+    side-channel), y patrones de DNS o SNI (NET-06, NET-08) siguen siendo legibles y suficientes para
+    reconstruir buena parte de la actividad de una víctima sin romper ningún cifrado.
+
+  perspectiva_defensiva: |
+    Captura continua en puntos estratégicos (choke points de red, no en cada host) alimenta IDS/NSM
+    (Network Security Monitoring) para detectar anomalías: escaneos, exfiltración, C2 conocido por
+    firma o comportamiento. Ángulo avanzado: la retención de metadatos de flujo (NetFlow/IPFIX — quién
+    habló con quién, cuánto, cuándo, sin guardar el payload completo) es una alternativa más barata en
+    almacenamiento que pcap completo y suele ser suficiente para investigación forense retrospectiva,
+    reservando la captura completa (payload incluido) para investigaciones activas de alta prioridad
+    donde el coste de almacenamiento y las implicaciones de privacidad de guardar todo el tráfico se
+    justifican.
+
+relationships:
+  - { type: prerequisite, target_slug: "net-02-ethernet-mac-arp" }
+  - { type: prerequisite, target_slug: "net-05-tcp-udp" }
+  - { type: related, target_slug: "net-06-dns" }
+  - { type: related, target_slug: "net-08-http-tls" }
+  - { type: continues_with, target_slug: "net-10-nmap" }

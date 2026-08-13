@@ -1,0 +1,138 @@
+domain: { slug: "networking", name: "Networking" }
+topic: { slug: "tools", name: "Herramientas de Análisis" }
+concept: { slug: "net-10-nmap", name: "Nmap" }
+lesson:
+  concepto: |
+    Nmap (Network Mapper) es la herramienta de referencia para reconocimiento de red: descubre qué hosts
+    están activos, qué puertos tienen abiertos, qué servicio y versión corre en cada uno, y opcionalmente
+    qué sistema operativo hay detrás — todo automatizando y sistematizando exactamente los mecanismos de
+    TCP/UDP (NET-05) que ya conoces, en vez de probarlos a mano uno por uno.
+
+    No es una sola técnica sino un conjunto de fases independientes que puedes combinar: descubrimiento
+    de hosts, escaneo de puertos, detección de servicio/versión, detección de sistema operativo, y
+    scripts (NSE) para enumeración o detección de vulnerabilidades específicas.
+
+  como_funciona: |
+    **Descubrimiento de hosts** (host discovery): antes de escanear puertos, Nmap intenta averiguar qué
+    IPs de un rango están activas, típicamente combinando ICMP echo, un TCP SYN/ACK a puertos comunes, y
+    ARP requests si el objetivo está en la misma LAN (ARP es más fiable ahí porque, como viste en NET-02,
+    no se puede bloquear sin romper la conectividad local). Se puede saltar con `-Pn` (tratar todos los
+    hosts como activos, útil cuando el descubrimiento está siendo bloqueado por firewall pero los puertos
+    sí responden).
+
+    **Escaneo de puertos**: por defecto, Nmap escanea los **1000 puertos TCP más comunes** (una lista
+    curada por frecuencia de uso real, no los primeros 1000 numéricamente). El tipo de escaneo por
+    defecto depende de privilegios: con acceso a raw sockets (root/administrador), usa **SYN scan**
+    (`-sS`) — envía SYN, y según la respuesta (SYN-ACK = abierto, RST = cerrado, nada/ICMP unreachable =
+    filtrado) determina el estado sin completar nunca el handshake de NET-05, dejando menos rastro en
+    logs de aplicación. Sin privilegios suficientes para raw sockets, cae automáticamente a **TCP
+    connect scan** (`-sT`), que sí completa el handshake usando las llamadas de socket normales del
+    sistema operativo — funcionalmente equivalente pero más lento y más visible.
+
+    **Escaneo UDP** (`-sU`) es intrínsecamente más lento y ambiguo (ver NET-05): sin respuesta a un
+    datagrama UDP, Nmap no puede distinguir con certeza entre "abierto sin servicio que responda a ese
+    payload" y "filtrado por firewall" — por eso usa payloads específicos por protocolo (probes) para
+    provocar una respuesta real de servicios conocidos (DNS, SNMP, etc.) y reducir esa ambigüedad.
+
+    **Detección de servicio/versión** (`-sV`): tras confirmar que un puerto está abierto, Nmap envía una
+    serie de probes específicos y compara la respuesta (el banner que muchos servicios entregan al
+    conectar, o el comportamiento ante ciertos payloads) contra su base de datos de firmas para
+    identificar no solo el protocolo sino la versión exacta del software.
+
+    **Detección de sistema operativo** (`-O`): analiza peculiaridades de la implementación de la pila
+    TCP/IP del objetivo (valores iniciales de TTL, tamaño de ventana TCP, opciones TCP, orden de campos
+    en ciertos paquetes) que varían sutilmente entre sistemas operativos y versiones de kernel, y las
+    compara contra una base de datos de fingerprints conocidos — es inferencia estadística, no una
+    consulta directa, y puede equivocarse si el objetivo tiene la pila de red modificada o hay
+    normalización de tráfico (un firewall) en el camino.
+
+    **NSE (Nmap Scripting Engine)**: framework en Lua que extiende Nmap con scripts para enumeración
+    profunda, detección de vulnerabilidades conocidas, o incluso explotación básica. Los scripts de la
+    categoría `version` se ejecutan automáticamente junto con `-sV` sin necesidad de invocarlos aparte;
+    scripts de otras categorías se activan con `-sC` (el set por defecto, "safe") o `--script=<nombre>`
+    para uno específico.
+
+  por_que_importa: |
+    Nmap es, para la mayoría de pentesters, el primer contacto real con un objetivo: todo lo que enseñan
+    NET-01 a NET-09 (capas, TCP/UDP, DNS, análisis de paquetes) es lo que te permite interpretar
+    correctamente lo que Nmap reporta, en vez de aceptarlo ciegamente. Un resultado de Nmap sin ese
+    contexto es solo una lista de números; con él, es información accionable sobre la superficie de
+    ataque real de un objetivo.
+
+  visualizacion: |
+    ```
+    Fase                          Qué hace                              Capa/mecanismo
+    ─────────────────────────      ────────────────────────────────      ──────────────────
+    Host discovery                  ¿qué IPs están vivas?                 ICMP, ARP, TCP a puertos comunes
+    Port scan (-sS / -sT / -sU)      ¿qué puertos están abiertos?           handshake TCP / datagramas UDP
+    Service/version (-sV)             ¿qué software y versión corre ahí?    banners, probes de aplicación
+    OS detection (-O)                  ¿qué SO hay detrás?                   peculiaridades de la pila TCP/IP
+    NSE scripts (-sC / --script)         enumeración/vulnerabilidades          Lua, lógica específica por servicio
+    ```
+
+  ejemplo: |
+    Trivial: `nmap 192.168.1.1` escanea los 1000 puertos TCP más comunes de un solo host con el escaneo
+    por defecto y muestra estado (open/closed/filtered) de cada uno.
+
+    Avanzado: `nmap -sS -sV -O -p- --min-rate 1000 192.168.1.0/24` escanea **todos** los 65535 puertos
+    TCP (`-p-`, no solo el top 1000 por defecto) de una subred completa, con SYN scan, detección de
+    versión y de sistema operativo, forzando un ritmo mínimo de envío para acelerar el escaneo. Este tipo
+    de escaneo agresivo genera mucho tráfico y patrones fácilmente detectables por un IDS — la elección
+    entre velocidad y sigilo (`-T0` a `-T5`, timing templates; `--scan-delay`; escaneo distribuido en el
+    tiempo) es una decisión consciente según si el objetivo del ejercicio es cobertura rápida o evasión.
+
+  comandos: |
+    ```bash
+    nmap 192.168.1.1                          # escaneo TCP por defecto, top 1000 puertos
+    nmap -sS -sV -p- 192.168.1.1                 # SYN scan, versión de servicio, todos los puertos
+    nmap -sU --top-ports 20 192.168.1.1             # escaneo UDP de los 20 puertos UDP más comunes
+    nmap -O 192.168.1.1                                # detección de sistema operativo
+    nmap -sC -sV -oA resultado 192.168.1.1                # scripts NSE seguros + versión, guardando en 3 formatos
+    nmap -Pn -p 80,443 192.168.1.0/24                        # saltar host discovery, puertos específicos, subred completa
+    ```
+
+  errores_frecuentes: |
+    - Tratar "filtered" como sinónimo de "closed" al leer resultados. Filtered significa que Nmap no
+      pudo determinar el estado (firewall descartando silenciosamente el probe); closed significa que
+      recibió una respuesta activa (RST) confirmando que no hay servicio ahí — son conclusiones distintas
+      con implicaciones distintas para el siguiente paso del reconocimiento.
+    - Confiar ciegamente en el top 1000 de puertos por defecto y concluir "no hay más servicios" sin
+      escanear el rango completo (`-p-`) cuando el contexto lo justifica — servicios en puertos no
+      estándar (backdoors, servicios mal configurados deliberadamente en puertos altos) son invisibles a
+      un escaneo por defecto.
+    - Nivel intermedio: no considerar que el propio escaneo altera el objetivo temporalmente (agota
+      recursos, dispara alertas, en algunos casos tumba servicios frágiles) y lanzar un escaneo agresivo
+      sin autorización explícita o sin conocer la tolerancia del objetivo — un error operacional grave en
+      pentesting real, no solo técnico.
+    - Interpretar la detección de sistema operativo (`-O`) como un hecho verificado en vez de una
+      inferencia probabilística. Nmap reporta un porcentaje de confianza por una razón: puede equivocarse,
+      especialmente contra objetivos detrás de balanceadores de carga, con pilas TCP/IP personalizadas, o
+      normalizadas por un firewall/IPS en el camino.
+
+  regla_mental: |
+    Nmap no te dice la verdad del objetivo, te dice cómo respondió a preguntas concretas — la
+    interpretación sigue siendo tu trabajo.
+
+  perspectiva_ofensiva: |
+    Ajustar timing (`-T0`-`-T5`), fragmentación de paquetes (`-f`), señuelos (`--decoy`, mezclar tu IP
+    real entre IPs falsas en los probes) y el uso selectivo de SYN scan frente a connect scan son técnicas
+    de evasión que buscan reducir la probabilidad de detección por IDS/IPS sin sacrificar por completo la
+    cobertura del escaneo. Ángulo avanzado: en engagements reales, un reconocimiento completo casi nunca
+    es "un solo comando de Nmap" — se combina descubrimiento pasivo (OSINT, análisis de tráfico si hay
+    acceso, como en NET-09) con escaneo activo mínimo y dirigido, precisamente para minimizar la huella
+    detectable antes de tener claro qué defensas tiene el objetivo.
+
+  perspectiva_defensiva: |
+    Un escaneo Nmap agresivo (muchos SYN sin completar handshake, hacia muchos puertos, en poco tiempo,
+    desde una misma IP) es una de las firmas más reconocibles para cualquier IDS/IPS moderno, y rate
+    limiting o bloqueo automático tras cierto umbral de intentos fallidos es una mitigación estándar y
+    efectiva. Ángulo avanzado: honeypots y puertos señuelo (servicios falsos que no deberían recibir
+    tráfico legítimo nunca) convierten el propio reconocimiento del atacante en una alerta temprana de
+    alta confianza — cualquier conexión a esos puertos es, por definición, sospechosa, porque ningún
+    usuario ni sistema legítimo tiene razón para tocarlos, a diferencia de las alertas basadas en
+    volumen/velocidad de escaneo, que un atacante paciente puede evadir simplemente ralentizando el
+    ritmo.
+
+relationships:
+  - { type: prerequisite, target_slug: "net-05-tcp-udp" }
+  - { type: prerequisite, target_slug: "net-09-packet-analysis" }

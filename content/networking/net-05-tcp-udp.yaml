@@ -1,0 +1,130 @@
+domain: { slug: "networking", name: "Networking" }
+topic: { slug: "protocols", name: "Protocolos" }
+concept: { slug: "net-05-tcp-udp", name: "TCP y UDP" }
+lesson:
+  concepto: |
+    TCP y UDP son los dos protocolos de la capa de transporte que usan casi todas las aplicaciones de
+    Internet. Ambos añaden algo que IP por sí sola no tiene: **puertos**, un número de 16 bits (0-65535)
+    que identifica a qué proceso o servicio concreto dentro de un host va dirigido el tráfico — la IP te
+    lleva al host correcto, el puerto te lleva al servicio correcto dentro de ese host.
+
+    La diferencia entre ambos es un trade-off deliberado: TCP es fiable (garantiza entrega, orden y
+    detecta pérdidas) pero tiene overhead (handshake, confirmaciones, retransmisiones). UDP es
+    "best-effort" — envía y no verifica nada — pero es rápido y ligero. Se elige uno u otro según si la
+    aplicación necesita fiabilidad garantizada (TCP: HTTP, SSH, transferencia de archivos) o prioriza
+    velocidad y tolera pérdida ocasional (UDP: DNS, streaming, VoIP, gaming).
+
+  como_funciona: |
+    **TCP** es orientado a conexión: antes de enviar datos, establece un circuito lógico entre ambos
+    extremos mediante el **three-way handshake**:
+
+    ```
+    Cliente                              Servidor
+       │──── SYN (seq=x) ────────────────►│    "quiero conectar, mi número de secuencia inicial es x"
+       │◄─── SYN-ACK (seq=y, ack=x+1) ─────│    "acepto, mi secuencia es y, confirmo tu x"
+       │──── ACK (ack=y+1) ───────────────►│    "confirmo tu y, conexión establecida"
+    ```
+
+    A partir de ahí cada segmento TCP lleva números de secuencia y confirmación (ACK) que permiten al
+    receptor detectar segmentos perdidos, duplicados o fuera de orden, y pedir retransmisión. El cierre
+    usa un intercambio de FIN/ACK (four-way, cada lado cierra su mitad de la conexión de forma
+    independiente — full-duplex). TCP también implementa control de flujo (ventana deslizante, el
+    receptor le dice al emisor cuánto puede enviar sin saturarlo) y control de congestión (el emisor
+    ajusta su tasa de envío según la pérdida de paquetes observada en la red).
+
+    **UDP** no tiene nada de esto: cada datagrama es independiente, sin conexión previa, sin
+    confirmación, sin orden garantizado. La cabecera UDP tiene solo 8 bytes (puerto origen, puerto
+    destino, longitud, checksum) frente a los 20 bytes mínimos de la cabecera TCP — el diseño explícito
+    prioriza mínimo overhead sobre garantías.
+
+    Los puertos se dividen convencionalmente en tres rangos: **well-known** (0-1023, requieren privilegios
+    de administrador para que un proceso escuche en ellos en sistemas Unix — HTTP 80, HTTPS 443, SSH 22),
+    **registered** (1024-49151, asignables a aplicaciones específicas sin autoridad central estricta) y
+    **dynamic/ephemeral** (49152-65535, los que el sistema operativo asigna automáticamente como puerto
+    origen de una conexión saliente).
+
+  por_que_importa: |
+    Todo escaneo de puertos, todo firewall con estado, y buena parte del análisis de tráfico dependen de
+    entender la máquina de estados de TCP. Un firewall stateful solo deja pasar tráfico de respuesta si
+    reconoce que corresponde a una conexión TCP que él mismo vio iniciarse — eso es exactamente lo que
+    Nmap explota o esquiva según la técnica de escaneo que use.
+
+  visualizacion: |
+    ```
+    TCP: fiable, con estado                    UDP: sin estado, sin garantías
+    ┌───────────────────────┐                 ┌───────────────────────┐
+    │ SYN ──────────►        │                 │  datagrama ──────────►│  (y ya está, no hay confirmación
+    │        ◄────── SYN-ACK │                 │                       │   ni de que llegó ni de que se leyó)
+    │ ACK ──────────►        │                 └───────────────────────┘
+    │  datos, ordenados,      │
+    │  confirmados, con       │
+    │  retransmisión si       │
+    │  se pierde algo         │
+    │ FIN/ACK ◄──────────►    │
+    └───────────────────────┘
+    ```
+
+  ejemplo: |
+    Trivial: cuando visitas un sitio web, tu navegador abre una conexión TCP al puerto 443 del servidor
+    (HTTPS) desde un puerto efímero propio (ej. 51342) — puedes verlo con `ss -tn` mientras la página
+    carga.
+
+    Avanzado: en una captura de Wireshark de una descarga interrumpida por mala señal Wi-Fi, verás
+    segmentos TCP duplicados y "TCP Retransmission" marcados en rojo — es TCP funcionando correctamente
+    (detectando pérdida y retransmitiendo), no un fallo del protocolo. Si la misma pérdida ocurriera
+    sobre UDP (por ejemplo, en una llamada VoIP), no habría retransmisión — el codec de audio simplemente
+    tiene que tolerar el hueco (por eso VoIP prioriza baja latencia entregando lo que llega, en vez de
+    pausar a esperar retransmisiones que llegarían tarde para ser útiles).
+
+  comandos: |
+    ```bash
+    ss -tulnp              # sockets TCP/UDP escuchando, con proceso (requiere privilegios para ver el PID)
+    netstat -tulnp          # equivalente clásico, deprecado en favor de ss
+    nc -zv host 1-1000        # escaneo TCP simple de rango de puertos con netcat
+    nc -u host 53               # abrir conexión UDP manual, útil para probar servicios UDP a mano
+    ```
+
+  errores_frecuentes: |
+    - Pensar que un puerto cerrado y un puerto filtrado (por firewall) son lo mismo. TCP responde RST a
+      un puerto cerrado (información: "aquí no hay nadie escuchando") y no responde nada a un puerto
+      filtrado (silencio: "no sé si hay algo, el firewall lo bloquea") — Nmap distingue explícitamente
+      ambos estados, y confundirlos lleva a conclusiones erróneas sobre qué servicios existen realmente.
+    - Asumir que UDP "no tiene fiabilidad en absoluto" en la práctica. Muchas aplicaciones sobre UDP
+      implementan su propia fiabilidad en la capa de aplicación (QUIC, usado por HTTP/3, es UDP con una
+      capa de fiabilidad y cifrado propia) — UDP en sí es best-effort, pero la aplicación puede compensar.
+    - Nivel intermedio: creer que el three-way handshake por sí solo "garantiza" que el otro extremo es
+      quien dice ser. No hay autenticación en el handshake TCP — solo confirma que ambos lados pueden
+      recibir lo que el otro envía (útil contra IP spoofing ciego, porque el atacante no vería el
+      SYN-ACK, pero no protege contra un atacante que sí puede interceptar tráfico, como en un MITM).
+    - No distinguir puerto origen de puerto destino al leer una captura: el puerto destino identifica el
+      servicio solicitado; el puerto origen suele ser efímero y arbitrario, no tiene significado por sí
+      mismo más allá de identificar la conversación específica en el host que la inició.
+
+  regla_mental: |
+    TCP pregunta "¿llegó?" antes de seguir. UDP nunca pregunta — solo envía.
+
+  perspectiva_ofensiva: |
+    El comportamiento del handshake TCP es la base del escaneo de puertos: un SYN scan (`-sS` en Nmap)
+    envía SYN y, si recibe SYN-ACK, sabe que el puerto está abierto — sin completar el handshake (nunca
+    envía el ACK final), lo que lo hace más sigiloso y menos probable de quedar registrado en logs de
+    aplicación (aunque sí puede quedar en logs de firewall/IDS). Ángulo avanzado: técnicas como el escaneo
+    UDP son intrínsecamente más lentas y ambiguas porque la ausencia de respuesta puede significar "puerto
+    abierto sin servicio que responda" o "filtrado" — Nmap tiene que enviar payloads específicos por
+    protocolo (probes) para provocar respuestas y reducir esa ambigüedad, y aun así los escaneos UDP
+    completos son órdenes de magnitud más lentos que un SYN scan TCP equivalente.
+
+  perspectiva_defensiva: |
+    Un firewall stateful mantiene una tabla de conexiones TCP vistas y solo permite tráfico de retorno
+    que corresponda a una conexión iniciada legítimamente desde dentro — esto es lo que hace que un SYN
+    scan externo sin sesión previa sea bloqueado por defecto en la mayoría de configuraciones. Ángulo
+    avanzado: los IDS/IPS pueden detectar escaneos por patrones de tráfico anómalos (muchos SYN sin ACK
+    de vuelta, desde una misma IP, a muchos puertos distintos en poco tiempo — la firma clásica de un SYN
+    scan), pero un atacante puede evadir esa detección ralentizando el escaneo (`--scan-delay` en Nmap) o
+    distribuyéndolo en el tiempo, un trade-off directo entre sigilo y velocidad.
+
+relationships:
+  - { type: prerequisite, target_slug: "net-01-fundamentals" }
+  - { type: related, target_slug: "net-04-routing" }
+  - { type: continues_with, target_slug: "net-06-dns" }
+  - { type: continues_with, target_slug: "net-08-http-tls" }
+  - { type: continues_with, target_slug: "net-09-packet-analysis" }

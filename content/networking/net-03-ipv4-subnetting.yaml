@@ -1,0 +1,118 @@
+domain: { slug: "networking", name: "Networking" }
+topic: { slug: "addressing-routing", name: "Direccionamiento y Routing" }
+concept: { slug: "net-03-ipv4-subnetting", name: "IPv4, CIDR y Subnetting" }
+lesson:
+  concepto: |
+    Una dirección IPv4 identifica un host dentro de una red lógica: 32 bits, escritos como cuatro
+    números decimales de 0 a 255 separados por puntos (ej. `192.168.1.50`). A diferencia de la MAC, la
+    IP no es fija del hardware — se asigna (manual o automáticamente vía DHCP) y describe "en qué red
+    lógica estás", no "qué dispositivo eres".
+
+    Subnetting es el proceso de dividir un rango de direcciones IP en subredes más pequeñas. CIDR
+    (Classless Inter-Domain Routing) es la notación estándar para expresar de qué tamaño es una red:
+    `192.168.1.0/24` significa "los primeros 24 bits son la parte de red, los últimos 8 son la parte de
+    host disponible para asignar a dispositivos".
+
+  como_funciona: |
+    Una IP de 32 bits se divide conceptualmente en dos partes: **network** (identifica la subred) y
+    **host** (identifica el dispositivo dentro de esa subred). La máscara de subred (o el prefijo `/N`
+    en CIDR) define dónde está el corte. Con `/24`: 24 bits de red, 8 bits de host → 2^8 = 256
+    direcciones posibles, de las cuales 254 son usables (la primera es la dirección de red, la última es
+    broadcast).
+
+    ```
+    IP:      192.168.1.50    = 11000000.10101000.00000001.00110010
+    Máscara: 255.255.255.0   = 11111111.11111111.11111111.00000000   (/24)
+                                └──────── red ────────┘└─ host ─┘
+
+    Dirección de red     = IP AND máscara         = 192.168.1.0
+    Dirección de broadcast = red con bits de host en 1 = 192.168.1.255
+    Rango usable          = 192.168.1.1 – 192.168.1.254   (254 hosts)
+    ```
+
+    Subnetting real: si necesitas dividir `192.168.1.0/24` en 4 subredes iguales, "tomas prestados" 2
+    bits de la parte de host (2^2 = 4 subredes) y pasas de `/24` a `/26`. Cada subred `/26` tiene
+    2^(32-26) = 64 direcciones (62 usables): `192.168.1.0/26`, `192.168.1.64/26`, `192.168.1.128/26`,
+    `192.168.1.192/26`. Cuantos más bits prestas de host a red, más subredes obtienes pero cada una es
+    más pequeña — es un trade-off directo.
+
+    Rangos privados (RFC 1918, no enrutables en Internet pública, requieren NAT para salir):
+    `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`. `127.0.0.0/8` es loopback (tu propia máquina).
+    `169.254.0.0/16` es APIPA/link-local, autoasignada cuando DHCP falla.
+
+  por_que_importa: |
+    Subnetting es la habilidad práctica más usada en reconocimiento de red: dado un objetivo con IP
+    `10.0.5.23/24`, saber instantáneamente que su rango es `10.0.5.0–10.0.5.255` te dice qué escanear.
+    Es también la base para entender segmentación de red como control de seguridad: separar servidores
+    críticos en su propia subred, con reglas de firewall entre subredes, es de las mitigaciones más
+    efectivas contra movimiento lateral.
+
+  visualizacion: |
+    ```
+    /24  → 256 direcciones  (254 host)   ██████████████████████████████ red pequeña, típica LAN doméstica
+    /26  →  64 direcciones  ( 62 host)   ███████                        subred de una oficina/VLAN
+    /30  →   4 direcciones  (  2 host)   █                              enlace punto a punto (router-router)
+
+    192.168.1.0/24 dividido en 4 subredes /26:
+    ┌──────────────────┬──────────────────┬──────────────────┬──────────────────┐
+    │ .0/26             │ .64/26            │ .128/26           │ .192/26           │
+    │ .1  – .62 usables  │ .65 – .126 usables │ .129 – .190 usables│ .193 – .254 usables│
+    └──────────────────┴──────────────────┴──────────────────┴──────────────────┘
+    ```
+
+  ejemplo: |
+    Trivial: `10.0.0.5/8` te dice que la red va de `10.0.0.0` a `10.255.255.255` — 16.7 millones de
+    direcciones, típico de una red corporativa grande sin subdividir aún.
+
+    Avanzado: en un pentest, encuentras un host con IP `172.16.14.201/22`. `/22` significa 22 bits de
+    red, 10 de host → bloques de 4 direcciones "clase C" agrupadas. El tercer octeto (14) cae en un
+    bloque de 4: los `/22` que contienen `.14` son los que empiezan en múltiplos de 4 → la red es
+    `172.16.12.0/22`, rango `172.16.12.1–172.16.15.254`. Saber calcular esto mentalmente (sin
+    calculadora) te ahorra minutos críticos en un reconocimiento y evita escanear rangos equivocados
+    (o de más, generando ruido innecesario en los logs del objetivo).
+
+  comandos: |
+    ```bash
+    ip addr show                    # IP y máscara/prefijo de tus interfaces
+    ipcalc 192.168.1.50/26          # calcula red, broadcast, rango usable, máscara
+    sipcalc 192.168.1.0/24          # alternativa más detallada, soporta IPv6 también
+    ```
+
+  errores_frecuentes: |
+    - Olvidar restar la dirección de red y de broadcast al contar hosts usables: en `/24` son 254
+      usables, no 256.
+    - Confundir "clase" (A/B/C, sistema legado pre-1993) con CIDR. Las clases ya no determinan el
+      tamaño de una red — cualquier prefijo es válido en cualquier rango; "clase C" como sinónimo de
+      `/24` es jerga heredada, no una regla técnica vigente.
+    - Nivel intermedio: al subnetear, calcular el número de subredes o de hosts pero olvidar verificar
+      que los bloques resultantes empiecen en un múltiplo del tamaño de bloque (el error del ejemplo
+      avanzado arriba) — es la causa más común de calcular mal a qué subred pertenece una IP dada.
+    - Asumir que una IP privada (RFC 1918) implica "segura" o "no enrutable en ningún caso". Es no
+      enrutable en Internet pública por convención, pero perfectamente enrutable dentro de una VPN o una
+      red interna mal segmentada — y muchas organizaciones reutilizan los mismos rangos privados en
+      sitios distintos, generando conflictos al interconectarlos (ej. por VPN site-to-site).
+
+  regla_mental: |
+    El prefijo /N no describe un tamaño, describe un corte: todo lo que está antes del corte es la red,
+    todo lo que está después es el host.
+
+  perspectiva_ofensiva: |
+    Calcular subredes de cabeza es lo que separa un escaneo eficiente de uno ruidoso: en vez de lanzar
+    Nmap contra `0.0.0.0/0`, calculas el rango exacto del objetivo a partir de una sola IP filtrada y
+    concentras el escaneo ahí. Ángulo más avanzado: en redes internas grandes, encontrar una IP con
+    máscara inusual (`/30` en un host de usuario, por ejemplo) suele delatar un enlace punto a punto o
+    equipo de infraestructura (router, firewall) mal segmentado del resto — vale la pena investigarlo
+    como pivote potencial.
+
+  perspectiva_defensiva: |
+    Subnetting bien diseñado es control de acceso por arquitectura: si servidores de base de datos viven
+    en su propia subred con firewall que solo permite tráfico desde la subred de aplicación, un atacante
+    que compromete un host de usuario no puede alcanzar la base de datos aunque la conozca, porque el
+    tráfico nunca sale de su segmento. Ángulo avanzado: micro-segmentación (subredes muy pequeñas, `/28`
+    o menores, por función) reduce el "blast radius" de un compromiso, pero incrementa la complejidad
+    operativa — es un trade-off consciente entre seguridad y gestión, no una mejora gratuita.
+
+relationships:
+  - { type: prerequisite, target_slug: "net-01-fundamentals" }
+  - { type: continues_with, target_slug: "net-04-routing" }
+  - { type: continues_with, target_slug: "net-07-dhcp" }
