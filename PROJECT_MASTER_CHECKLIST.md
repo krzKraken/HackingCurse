@@ -55,7 +55,8 @@
 - [ ] Calificación asistida por IA para respuestas de `free_explanation` (extensión futura, flag `AI_GRADING_ENABLED`)
 
 ### Dashboard
-- [ ] Agregación de métricas ya calculadas (nivel por dominio, retención, repasos pendientes)
+- [x] Agregación de métricas ya calculadas (nivel por dominio, retención, repasos pendientes)
+- [x] Página `/dashboard` con tarjetas "Próximamente" para widgets aún no construidos
 
 ### Focus/Timer + "No sé qué estudiar"
 - [ ] LearningSession/FocusSession, timer (4 modos), Focus Mode
