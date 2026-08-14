@@ -104,7 +104,7 @@ que ya tiene acceso al Docker SDK y a la base de datos.
 | Caso | Comportamiento |
 |---|---|
 | Instancia no `running` | API cierra el WS con código 4404, mensaje "lab not running" |
-| Usuario no es dueño de la instancia | API cierra el WS con código 4403 |
+| Usuario no es dueño de la instancia (o no existe) | API cierra el WS con código 4404 — mismo código que "no existe", sin distinguir, para no filtrar si un id de instancia ajeno existe. Consistente con `_get_instance_or_404` ya usado en las rutas HTTP existentes del mismo router. |
 | Worker/relay no disponible | API cierra el WS con código 4503, mensaje "terminal service unavailable" |
 | Contenedor sin `/bin/sh` | El error de `exec_start` se propaga como cierre 4500 con el mensaje de Docker (no se asume silenciosamente que todas las imágenes lo tienen, aunque las actuales sí) |
 | Browser se desconecta | La API cierra su WS saliente hacia el worker; el worker cierra el exec socket — no quedan procesos exec huérfanos |
