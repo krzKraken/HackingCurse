@@ -64,11 +64,12 @@
 - [ ] Context recap (3 preguntas rápidas tras un hueco de varios días — no implementado en este sub-plan)
 - [x] Algoritmo de recomendación única ("No sé qué estudiar")
 
-### Labs + orquestador Docker (Sub-plan A — sin terminal web, ver Sub-plan B pendiente)
+### Labs + orquestador Docker
 - [x] Modelo Laboratory/LabInstance + definición declarativa YAML (sin LabAttempt separado — simplificación documentada)
 - [x] Worker orquestador (RQ) con acceso exclusivo al socket Docker
 - [x] Aislamiento de red verificado (test de integración real: no alcanza Internet ni Postgres del host)
 - [x] 1 lab Docker real (FlagBox, IDOR sobre TCP custom) con cleanup automático — más labs quedan pendientes de contenido, no de infraestructura
+- [x] Terminal web integrada para labs (xterm.js + docker exec vía WebSockets, proxy autenticado a través del worker)
 
 ## Fase 2
 
