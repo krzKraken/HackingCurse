@@ -1,14 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import asyncio
+
+import websockets
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 from redis import Redis
 from rq import Queue
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
+from app.auth.sessions import get_session
 from app.config import settings
 from app.db import get_db
 from app.labs import service
 from app.labs.schemas import HintOut, LabInstanceOut, LaboratoryOut, SubmitFlagRequest, SubmitFlagResponse
-from app.models.lab import Laboratory, LabInstance
+from app.models.lab import Laboratory, LabInstance, LabInstanceStatus
 from app.models.user import User
 
 router = APIRouter()
@@ -116,3 +120,58 @@ def submit_flag(
     instance = _get_instance_or_404(db, user, instance_id)
     correct = service.submit_flag(db, instance, payload.flag)
     return SubmitFlagResponse(correct=correct, solved=instance.solved)
+
+
+@router.websocket("/instances/{instance_id}/terminal")
+async def terminal(websocket: WebSocket, instance_id: str) -> None:
+    await websocket.accept()
+
+    session_id = websocket.cookies.get(settings.cookie_name)
+    session = get_session(session_id) if session_id else None
+    if session is None or not session["mfa_verified"]:
+        await websocket.close(4401, "not authenticated")
+        return
+
+    db = next(get_db())
+    try:
+        instance = service.get_instance(db, instance_id, session["user_id"])
+        if instance is None:
+            await websocket.close(4404, "lab instance not found")
+            return
+        if instance.status != LabInstanceStatus.running:
+            await websocket.close(4404, "lab not running")
+            return
+    finally:
+        db.close()
+
+    try:
+        relay_url = f"ws://127.0.0.1:{settings.labs_terminal_relay_port}/{instance_id}"
+        async with websockets.connect(relay_url) as relay_ws:
+
+            async def browser_to_relay():
+                while True:
+                    message = await websocket.receive()
+                    if message["type"] == "websocket.disconnect":
+                        break
+                    data = message.get("bytes") or message.get("text")
+                    if data is not None:
+                        await relay_ws.send(data)
+
+            async def relay_to_browser():
+                async for message in relay_ws:
+                    if isinstance(message, bytes):
+                        await websocket.send_bytes(message)
+                    else:
+                        await websocket.send_text(message)
+
+            to_relay = asyncio.ensure_future(browser_to_relay())
+            to_browser = asyncio.ensure_future(relay_to_browser())
+            try:
+                await asyncio.wait({to_relay, to_browser}, return_when=asyncio.FIRST_COMPLETED)
+            finally:
+                to_relay.cancel()
+                to_browser.cancel()
+    except (OSError, websockets.exceptions.WebSocketException):
+        await websocket.close(4503, "terminal service unavailable")
+    except WebSocketDisconnect:
+        pass
