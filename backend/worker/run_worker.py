@@ -6,6 +6,7 @@ from rq import Queue, Worker
 
 from app.config import settings
 from worker.jobs import sweep_expired_labs
+from worker.terminal_relay import run_relay_server
 
 QUEUE_NAME = "labs"
 SWEEP_INTERVAL_SECONDS = 60
@@ -22,6 +23,11 @@ def run_sweep_loop() -> None:
 
 def main() -> None:
     threading.Thread(target=run_sweep_loop, daemon=True).start()
+    threading.Thread(
+        target=run_relay_server,
+        args=("127.0.0.1", settings.labs_terminal_relay_port),
+        daemon=True,
+    ).start()
 
     redis_conn = Redis.from_url(settings.redis_url)
     queue = Queue(QUEUE_NAME, connection=redis_conn)
