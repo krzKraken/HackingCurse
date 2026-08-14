@@ -77,8 +77,12 @@
 - [x] Challenges: cubierto por `Laboratory.type` (campo ya existente, sin modelo nuevo — ver `docs/superpowers/specs/2026-08-14-challenges-hints-design.md` decisión 1)
 - [x] Hint Dependency + Independence Score en el Dashboard
 
+### Gamificación (sobria)
+- [x] Achievements basados en habilidad (7 en el catálogo v1: first_shell, no_hint_required, independent_mind, persistent, perfect_recall, domain_mastery, deep_focus)
+- [x] XP y niveles (calculado, no almacenado) en el Dashboard
+- [ ] Skill tree — explícitamente fuera de alcance del v1 (ver `docs/superpowers/specs/2026-08-14-gamificacion-design.md`)
+
 ### Pendientes de Fase 2
-- [ ] Gamificación (sobria)
 - [ ] Knowledge graph navegable — vista visual interactiva (hoy solo lista jerárquica vía relaciones)
 - [ ] Base de datos de vulnerabilidades
 - [ ] Error Memory completo (`ErrorPattern`)
