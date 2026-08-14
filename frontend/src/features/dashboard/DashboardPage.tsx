@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { api, DashboardSummary } from "../../lib/api";
+import { Link, useNavigate } from "react-router-dom";
+import { api, DashboardSummary, GraphResponse } from "../../lib/api";
+import { KnowledgeGraph } from "../graph/KnowledgeGraph";
 
 const COMING_SOON = [
   "Fragmentación",
-  "Knowledge Connectivity",
   "Error Memory",
   "Labs recomendados",
   "Tiempo de práctica",
@@ -12,10 +12,13 @@ const COMING_SOON = [
 ];
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [graph, setGraph] = useState<GraphResponse | null>(null);
 
   useEffect(() => {
     api.getDashboardSummary().then(setSummary);
+    api.getKnowledgeGraph().then(setGraph);
   }, []);
 
   if (!summary) return <p>Cargando…</p>;
@@ -111,6 +114,27 @@ export function DashboardPage() {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section>
+        <h2>Knowledge Graph</h2>
+        {graph === null ? (
+          <p>Cargando…</p>
+        ) : graph.nodes.length === 0 ? (
+          <p>Todavía no hay contenido para mostrar.</p>
+        ) : (
+          <>
+            <KnowledgeGraph
+              data={graph}
+              height={300}
+              interactive={false}
+              onNodeClick={(slug) => navigate(`/lessons/${slug}`)}
+            />
+            <p>
+              <Link to="/graph">Ver grafo completo</Link>
+            </p>
+          </>
         )}
       </section>
 
