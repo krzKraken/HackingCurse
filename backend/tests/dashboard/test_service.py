@@ -147,3 +147,87 @@ def test_recent_activity_orders_by_answered_at_desc(db_session):
 
     assert activity[0]["outcome"] == "incorrect"
     assert activity[1]["outcome"] == "correct"
+
+
+from app.models.lab import Laboratory, LabInstance, LabInstanceStatus
+
+
+def _seed_laboratory(db, lab_id="test-lab"):
+    lab = db.query(Laboratory).filter_by(id=lab_id).first()
+    if lab is not None:
+        return lab
+    lab = Laboratory(
+        id=lab_id,
+        title="Test Lab",
+        type="black_box",
+        difficulty="beginner",
+        duration_estimate_min=10,
+        docker_build_context="labs/flagbox",
+        hints=[],
+        cpu_limit="0.5",
+        memory_limit_mb=128,
+        max_lifetime_min=30,
+        cleanup_remove_volumes=True,
+    )
+    db.add(lab)
+    db.commit()
+    return lab
+
+
+def _seed_solved_instance(db, user, hints_used):
+    from datetime import datetime, timezone
+
+    lab = _seed_laboratory(db)
+    instance = LabInstance(
+        laboratory_id=lab.id,
+        user_id=user.id,
+        status=LabInstanceStatus.destroyed,
+        context_seed={},
+        requested_at=datetime.now(timezone.utc),
+        solved=True,
+        hints_used=hints_used,
+    )
+    db.add(instance)
+    db.commit()
+    return instance
+
+
+def test_hint_dependency_with_no_solved_labs_has_no_independence_score(db_session):
+    user = _seed_user(db_session)
+    result = service.get_hint_dependency(db_session, user.id)
+    assert result == {"breakdown": {}, "independence_score": None}
+
+
+def test_hint_dependency_breakdown_and_independence_score(db_session):
+    user = _seed_user(db_session)
+    _seed_solved_instance(db_session, user, hints_used=0)
+    _seed_solved_instance(db_session, user, hints_used=0)
+    _seed_solved_instance(db_session, user, hints_used=1)
+    _seed_solved_instance(db_session, user, hints_used=2)
+
+    result = service.get_hint_dependency(db_session, user.id)
+
+    assert result["breakdown"] == {0: 2, 1: 1, 2: 1}
+    assert result["independence_score"] == 50.0
+
+
+def test_hint_dependency_only_counts_solved_instances(db_session):
+    from datetime import datetime, timezone
+
+    user = _seed_user(db_session)
+    lab = _seed_laboratory(db_session)
+    unsolved = LabInstance(
+        laboratory_id=lab.id,
+        user_id=user.id,
+        status=LabInstanceStatus.running,
+        context_seed={},
+        requested_at=datetime.now(timezone.utc),
+        solved=False,
+        hints_used=3,
+    )
+    db_session.add(unsolved)
+    db_session.commit()
+
+    result = service.get_hint_dependency(db_session, user.id)
+
+    assert result == {"breakdown": {}, "independence_score": None}

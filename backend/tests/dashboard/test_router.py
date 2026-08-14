@@ -51,3 +51,14 @@ def test_dashboard_returns_summary_shape(client, db_session):
     body = resp.json()
     assert body["global_mastery"] == 75.0
     assert body["domains"][0]["slug"] == "networking"
+
+
+def test_dashboard_includes_hint_dependency_with_no_solved_labs(client, db_session):
+    _login_as_owner(client, db_session)
+
+    resp = client.get("/api/v1/dashboard/summary")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["hint_dependency"] == {}
+    assert body["independence_score"] is None

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.content import Concept, Domain, Topic
+from app.models.lab import LabInstance
 from app.models.mastery import ConceptMastery, ReviewSchedule
 from app.models.question import Question, QuestionStatus
 from app.models.review import ReviewItem, ReviewSession
@@ -109,7 +110,20 @@ def get_recent_activity(db: Session, user_id, limit: int = 10) -> list[dict]:
     ]
 
 
+def get_hint_dependency(db: Session, user_id) -> dict:
+    solved = db.query(LabInstance).filter(LabInstance.user_id == user_id, LabInstance.solved == True).all()
+    if not solved:
+        return {"breakdown": {}, "independence_score": None}
+    breakdown: dict[int, int] = {}
+    for instance in solved:
+        breakdown[instance.hints_used] = breakdown.get(instance.hints_used, 0) + 1
+    no_hints_count = breakdown.get(0, 0)
+    independence_score = no_hints_count / len(solved) * 100
+    return {"breakdown": breakdown, "independence_score": independence_score}
+
+
 def get_summary(db: Session, user_id) -> dict:
+    hint_dependency = get_hint_dependency(db, user_id)
     return {
         "global_mastery": get_global_mastery(db, user_id),
         "domains": get_domains_summary(db, user_id),
@@ -117,4 +131,6 @@ def get_summary(db: Session, user_id) -> dict:
         "weak_concepts": get_weak_concepts(db, user_id),
         "overdue_concepts": get_overdue_concepts(db, user_id),
         "recent_activity": get_recent_activity(db, user_id),
+        "hint_dependency": hint_dependency["breakdown"],
+        "independence_score": hint_dependency["independence_score"],
     }

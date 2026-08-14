@@ -37,3 +37,5 @@ class DashboardSummary(BaseModel):
     weak_concepts: list[ConceptScoreSummary]
     overdue_concepts: list[OverdueConceptSummary]
     recent_activity: list[RecentActivityItem]
+    hint_dependency: dict[int, int]
+    independence_score: float | None
