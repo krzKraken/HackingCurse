@@ -1,4 +1,8 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict
+
+from app.models.content import RelationshipType
 
 
 class ConceptSummary(BaseModel):
@@ -44,3 +48,24 @@ class ConceptDetail(BaseModel):
     name: str
     lesson: LessonOut | None
     relationships: ConceptRelationships
+
+
+class GraphNode(BaseModel):
+    slug: str
+    name: str
+    domain_slug: str
+    topic_slug: str
+    mastery_score: float
+    studied: bool
+    next_due_at: datetime | None
+
+
+class GraphEdge(BaseModel):
+    source_slug: str
+    target_slug: str
+    type: RelationshipType
+
+
+class GraphResponse(BaseModel):
+    nodes: list[GraphNode]
+    edges: list[GraphEdge]
