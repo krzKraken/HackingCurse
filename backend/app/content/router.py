@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
 from app.content import service
-from app.content.schemas import ConceptDetail, DomainSummary
+from app.content.schemas import ConceptDetail, DomainSummary, GraphResponse
 from app.db import get_db
 from app.models.user import User
 
@@ -15,6 +15,13 @@ def list_domains(
     db: Session = Depends(get_db), _user: User = Depends(get_current_user)
 ) -> list[DomainSummary]:
     return service.get_domains_tree(db)
+
+
+@router.get("/graph", response_model=GraphResponse)
+def get_knowledge_graph(
+    db: Session = Depends(get_db), user: User = Depends(get_current_user)
+) -> GraphResponse:
+    return service.get_knowledge_graph(db, user.id)
 
 
 @router.get("/concepts/{slug}", response_model=ConceptDetail)
