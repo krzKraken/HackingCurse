@@ -62,3 +62,46 @@ def test_dashboard_includes_hint_dependency_with_no_solved_labs(client, db_sessi
     body = resp.json()
     assert body["hint_dependency"] == {}
     assert body["independence_score"] is None
+
+
+def test_dashboard_includes_hint_dependency_for_solved_lab(client, db_session):
+    from datetime import datetime, timezone
+
+    from app.models.lab import LabInstance, LabInstanceStatus, Laboratory
+
+    user = _login_as_owner(client, db_session)
+
+    laboratory = Laboratory(
+        id="hint-dep-test-lab",
+        title="Hint Dep Test Lab",
+        type="black_box",
+        difficulty="beginner",
+        duration_estimate_min=10,
+        docker_build_context="labs/flagbox",
+        hints=[],
+        cpu_limit="0.5",
+        memory_limit_mb=128,
+        max_lifetime_min=30,
+        cleanup_remove_volumes=True,
+    )
+    db_session.add(laboratory)
+    db_session.commit()
+
+    instance = LabInstance(
+        laboratory_id=laboratory.id,
+        user_id=user.id,
+        status=LabInstanceStatus.destroyed,
+        context_seed={},
+        requested_at=datetime.now(timezone.utc),
+        solved=True,
+        hints_used=0,
+    )
+    db_session.add(instance)
+    db_session.commit()
+
+    resp = client.get("/api/v1/dashboard/summary")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["hint_dependency"] == {"0": 1}
+    assert body["independence_score"] == 100.0

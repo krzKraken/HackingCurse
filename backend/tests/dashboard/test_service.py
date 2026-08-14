@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.dashboard import service
 from app.models.content import Concept, Domain, Topic
+from app.models.lab import LabInstance, LabInstanceStatus, Laboratory
 from app.models.mastery import ConceptMastery, ReviewSchedule
 from app.models.question import Question, QuestionStatus, QuestionType, QuestionVariant
 from app.models.review import ReviewItem, ReviewOutcome, ReviewSession
@@ -149,9 +150,6 @@ def test_recent_activity_orders_by_answered_at_desc(db_session):
     assert activity[1]["outcome"] == "correct"
 
 
-from app.models.lab import Laboratory, LabInstance, LabInstanceStatus
-
-
 def _seed_laboratory(db, lab_id="test-lab"):
     lab = db.query(Laboratory).filter_by(id=lab_id).first()
     if lab is not None:
@@ -175,8 +173,6 @@ def _seed_laboratory(db, lab_id="test-lab"):
 
 
 def _seed_solved_instance(db, user, hints_used):
-    from datetime import datetime, timezone
-
     lab = _seed_laboratory(db)
     instance = LabInstance(
         laboratory_id=lab.id,
@@ -212,8 +208,6 @@ def test_hint_dependency_breakdown_and_independence_score(db_session):
 
 
 def test_hint_dependency_only_counts_solved_instances(db_session):
-    from datetime import datetime, timezone
-
     user = _seed_user(db_session)
     lab = _seed_laboratory(db_session)
     unsolved = LabInstance(
