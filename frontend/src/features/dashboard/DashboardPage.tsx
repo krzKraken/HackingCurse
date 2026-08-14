@@ -8,7 +8,6 @@ const COMING_SOON = [
   "Error Memory",
   "Labs recomendados",
   "Tiempo de práctica",
-  "Logros",
   "Transfer / Methodology Score",
 ];
 
@@ -94,6 +93,24 @@ export function DashboardPage() {
                 ))}
             </ul>
           </>
+        )}
+      </section>
+
+      <section>
+        <h2>Logros</h2>
+        <p>
+          Nivel {summary.level} — {summary.xp_total} XP
+        </p>
+        {summary.achievements.length === 0 ? (
+          <p>Todavía no desbloqueaste ningún logro.</p>
+        ) : (
+          <ul>
+            {summary.achievements.map((a) => (
+              <li key={a.key}>
+                <strong>{a.title}</strong> — {a.description} ({new Date(a.unlocked_at).toLocaleDateString()})
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 

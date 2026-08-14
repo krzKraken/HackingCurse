@@ -107,6 +107,9 @@ export type DashboardSummary = {
   recent_activity: { concept_slug: string; concept_name: string; outcome: string; answered_at: string }[];
   hint_dependency: Record<string, number>;
   independence_score: number | null;
+  xp_total: number;
+  level: number;
+  achievements: { key: string; title: string; description: string; xp_value: number; unlocked_at: string }[];
 };
 
 export type LearningSession = {
