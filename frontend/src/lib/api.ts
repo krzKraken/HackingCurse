@@ -58,6 +58,27 @@ export type DomainSummary = {
   topics: { slug: string; name: string; concepts: ConceptSummary[] }[];
 };
 
+export type GraphNode = {
+  slug: string;
+  name: string;
+  domain_slug: string;
+  topic_slug: string;
+  mastery_score: number;
+  studied: boolean;
+  next_due_at: string | null;
+};
+
+export type GraphEdge = {
+  source_slug: string;
+  target_slug: string;
+  type: "prerequisite" | "related" | "continues_with";
+};
+
+export type GraphResponse = {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+};
+
 export type Note = {
   id: string;
   title: string;
@@ -166,6 +187,7 @@ export const api = {
   logout: () => request<void>("/auth/logout", { method: "POST" }),
   listDomains: () => request<DomainSummary[]>("/content/domains"),
   getConcept: (slug: string) => request<ConceptDetail>(`/content/concepts/${slug}`),
+  getKnowledgeGraph: () => request<GraphResponse>("/content/graph"),
   listNotes: () => request<Note[]>("/notes"),
   createNote: (title: string, body_markdown: string) =>
     request<Note>("/notes", { method: "POST", body: JSON.stringify({ title, body_markdown }) }),
