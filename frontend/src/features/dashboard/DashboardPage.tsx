@@ -8,9 +8,8 @@ const COMING_SOON = [
   "Error Memory",
   "Labs recomendados",
   "Tiempo de práctica",
-  "Pistas usadas",
   "Logros",
-  "Independence / Transfer / Methodology Score",
+  "Transfer / Methodology Score",
 ];
 
 export function DashboardPage() {
@@ -76,6 +75,26 @@ export function DashboardPage() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section>
+        <h2>Uso de pistas en labs</h2>
+        {summary.independence_score === null ? (
+          <p>Todavía no resolviste ningún lab.</p>
+        ) : (
+          <>
+            <p>Independence Score: {summary.independence_score.toFixed(0)}%</p>
+            <ul>
+              {Object.entries(summary.hint_dependency)
+                .sort(([a], [b]) => Number(a) - Number(b))
+                .map(([level, count]) => (
+                  <li key={level}>
+                    {level === "0" ? "Sin pistas" : `Pista ${level}`}: {count}
+                  </li>
+                ))}
+            </ul>
+          </>
+        )}
       </section>
 
       <section>

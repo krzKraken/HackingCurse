@@ -105,6 +105,8 @@ export type DashboardSummary = {
   weak_concepts: { slug: string; name: string; mastery_score: number }[];
   overdue_concepts: { slug: string; name: string; next_due_at: string }[];
   recent_activity: { concept_slug: string; concept_name: string; outcome: string; answered_at: string }[];
+  hint_dependency: Record<string, number>;
+  independence_score: number | null;
 };
 
 export type LearningSession = {
