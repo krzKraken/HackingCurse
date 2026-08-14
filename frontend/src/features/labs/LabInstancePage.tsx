@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api, LabInstance } from "../../lib/api";
+import { LabTerminal } from "./LabTerminal";
 
 const POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATUSES = new Set(["running", "destroyed", "expired", "failed"]);
@@ -11,6 +12,7 @@ export function LabInstancePage() {
   const [hintText, setHintText] = useState<string | null>(null);
   const [flag, setFlag] = useState("");
   const [submitResult, setSubmitResult] = useState<string | null>(null);
+  const [showTerminal, setShowTerminal] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -59,6 +61,15 @@ export function LabInstancePage() {
         <p>
           Conéctate con: <code>nc localhost {instance.host_port}</code>
         </p>
+      )}
+
+      {instance.status === "running" && (
+        <div>
+          <button onClick={() => setShowTerminal((v) => !v)}>
+            {showTerminal ? "Cerrar terminal" : "Abrir terminal"}
+          </button>
+          {showTerminal && <LabTerminal instanceId={instance.id} />}
+        </div>
       )}
 
       <div>

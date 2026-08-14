@@ -571,7 +571,7 @@ No backend/pytest tests apply here — this is a frontend UI component. Verifica
 - [ ] **Step 1: Add frontend dependencies**
 
 ```bash
-cd frontend && npm install xterm@^5.5.0 xterm-addon-fit@^0.10.0
+cd frontend && npm install @xterm/xterm@^6.0.0 @xterm/addon-fit@^0.11.0
 ```
 
 - [ ] **Step 2: Enable WebSocket proxying in Vite dev server**
@@ -600,9 +600,9 @@ export default defineConfig({
 ```tsx
 // frontend/src/features/labs/LabTerminal.tsx
 import { useEffect, useRef } from "react";
-import { Terminal } from "xterm";
-import { FitAddon } from "xterm-addon-fit";
-import "xterm/css/xterm.css";
+import { Terminal } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
+import "@xterm/xterm/css/xterm.css";
 
 type LabTerminalProps = {
   instanceId: string;
