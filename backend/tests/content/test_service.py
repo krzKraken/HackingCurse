@@ -1,5 +1,10 @@
-from app.content.service import get_concept_detail, get_domains_tree
+from datetime import datetime, timezone
+
+from app.content.schemas import GraphEdge
+from app.content.service import get_concept_detail, get_domains_tree, get_knowledge_graph
 from app.models.content import Concept, ConceptRelationship, Domain, Lesson, RelationshipType, Topic
+from app.models.mastery import ConceptMastery, ReviewSchedule
+from app.models.user import User
 
 
 def _seed_minimal(db):
@@ -55,12 +60,6 @@ def test_get_concept_detail_returns_none_for_unknown_slug(db_session):
     assert get_concept_detail(db_session, "does-not-exist") is None
 
 
-from app.content.service import get_knowledge_graph
-from app.content.schemas import GraphEdge
-from app.models.mastery import ConceptMastery
-from app.models.user import User
-
-
 def _seed_user(db):
     user = User(username="owner", password_hash="x", totp_secret="x")
     db.add(user)
@@ -84,7 +83,13 @@ def test_get_knowledge_graph_includes_all_concepts_and_relationships(db_session)
 def test_get_knowledge_graph_reflects_user_mastery(db_session):
     _, _, _, concept = _seed_minimal(db_session)
     user = _seed_user(db_session)
-    db_session.add(ConceptMastery(user_id=user.id, concept_id=concept.id, mastery_score=75.0))
+    mastery = ConceptMastery(user_id=user.id, concept_id=concept.id, mastery_score=75.0)
+    db_session.add(mastery)
+    db_session.flush()
+    next_due_at = datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc)
+    db_session.add(
+        ReviewSchedule(concept_mastery_id=mastery.id, stability_days=3.5, next_due_at=next_due_at)
+    )
     db_session.commit()
 
     graph = get_knowledge_graph(db_session, user.id)
@@ -92,9 +97,35 @@ def test_get_knowledge_graph_reflects_user_mastery(db_session):
     node = next(n for n in graph.nodes if n.slug == "net-02")
     assert node.studied is True
     assert node.mastery_score == 75.0
+    assert node.next_due_at == next_due_at
 
     other_node = next(n for n in graph.nodes if n.slug == "net-01")
     assert other_node.studied is False
+    assert other_node.next_due_at is None
+
+
+def test_get_knowledge_graph_includes_related_and_continues_with_edges(db_session):
+    domain, topic, prereq, concept = _seed_minimal(db_session)
+    user = _seed_user(db_session)
+
+    related = Concept(topic_id=topic.id, slug="net-03", name="Subnetting")
+    continues = Concept(topic_id=topic.id, slug="net-04", name="VLANs")
+    db_session.add_all([related, continues])
+    db_session.flush()
+
+    db_session.add(ConceptRelationship(source_id=concept.id, target_id=related.id, type=RelationshipType.related))
+    db_session.add(
+        ConceptRelationship(source_id=concept.id, target_id=continues.id, type=RelationshipType.continues_with)
+    )
+    db_session.commit()
+
+    graph = get_knowledge_graph(db_session, user.id)
+
+    assert GraphEdge(source_slug="net-02", target_slug="net-03", type=RelationshipType.related) in graph.edges
+    assert (
+        GraphEdge(source_slug="net-02", target_slug="net-04", type=RelationshipType.continues_with)
+        in graph.edges
+    )
 
 
 def test_get_knowledge_graph_handles_concept_without_relationships(db_session):

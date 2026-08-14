@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useMemo, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { ForceGraphMethods } from "react-force-graph-2d";
 import { GraphResponse } from "../../lib/api";
 
@@ -38,6 +38,10 @@ function nodeFillColor(node: GraphNodeDatum, highlightSlug?: string): string {
   return node.studied ? masteryColor(node.mastery_score) : "#888888";
 }
 
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 export type KnowledgeGraphHandle = {
   centerOnNode: (slug: string) => void;
 };
@@ -53,6 +57,21 @@ type KnowledgeGraphProps = {
 export const KnowledgeGraph = forwardRef<KnowledgeGraphHandle, KnowledgeGraphProps>(
   function KnowledgeGraph({ data, height, interactive, highlightSlug, onNodeClick }, ref) {
     const graphRef = useRef<ForceGraphMethods>();
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const [width, setWidth] = useState<number | undefined>(() => wrapperRef.current?.clientWidth);
+
+    useEffect(() => {
+      const el = wrapperRef.current;
+      if (!el) return;
+      setWidth(el.clientWidth);
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setWidth(entry.contentRect.width);
+        }
+      });
+      observer.observe(el);
+      return () => observer.disconnect();
+    }, []);
 
     const graphData = useMemo(
       () => ({
@@ -77,27 +96,30 @@ export const KnowledgeGraph = forwardRef<KnowledgeGraphHandle, KnowledgeGraphPro
     }));
 
     return (
-      <ForceGraph2D
-        ref={graphRef}
-        graphData={graphData}
-        height={height}
-        nodeId="id"
-        nodeLabel={(node) => {
-          const n = node as GraphNodeDatum;
-          const masteryLine = n.studied ? `Mastery: ${n.mastery_score.toFixed(0)}%` : "No estudiado";
-          const dueLine = n.next_due_at
-            ? `<br/>Próximo repaso: ${new Date(n.next_due_at).toLocaleDateString()}`
-            : "";
-          return `<div><strong>${n.name}</strong><br/>${masteryLine}${dueLine}</div>`;
-        }}
-        nodeColor={(node) => nodeFillColor(node as GraphNodeDatum, highlightSlug)}
-        enableNodeDrag={interactive}
-        linkColor={(link) => EDGE_COLOR[(link as GraphLinkDatum).type]}
-        linkDirectionalArrowLength={(link) => ((link as GraphLinkDatum).type === "related" ? 0 : 6)}
-        linkDirectionalArrowRelPos={1}
-        linkLineDash={(link) => ((link as GraphLinkDatum).type === "continues_with" ? [2, 2] : null)}
-        onNodeClick={(node) => onNodeClick((node as GraphNodeDatum).slug)}
-      />
+      <div ref={wrapperRef} style={{ width: "100%", minWidth: 0 }}>
+        <ForceGraph2D
+          ref={graphRef}
+          graphData={graphData}
+          width={width}
+          height={height}
+          nodeId="id"
+          nodeLabel={(node) => {
+            const n = node as GraphNodeDatum;
+            const masteryLine = n.studied ? `Mastery: ${n.mastery_score.toFixed(0)}%` : "No estudiado";
+            const dueLine = n.next_due_at
+              ? `<br/>Próximo repaso: ${new Date(n.next_due_at).toLocaleDateString()}`
+              : "";
+            return `<div><strong>${escapeHtml(n.name)}</strong><br/>${masteryLine}${dueLine}</div>`;
+          }}
+          nodeColor={(node) => nodeFillColor(node as GraphNodeDatum, highlightSlug)}
+          enableNodeDrag={interactive}
+          linkColor={(link) => EDGE_COLOR[(link as GraphLinkDatum).type]}
+          linkDirectionalArrowLength={(link) => ((link as GraphLinkDatum).type === "related" ? 0 : 6)}
+          linkDirectionalArrowRelPos={1}
+          linkLineDash={(link) => ((link as GraphLinkDatum).type === "continues_with" ? [2, 2] : null)}
+          onNodeClick={(node) => onNodeClick((node as GraphNodeDatum).slug)}
+        />
+      </div>
     );
   }
 );

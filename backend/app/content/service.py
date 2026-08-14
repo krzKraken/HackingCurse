@@ -73,6 +73,7 @@ def get_knowledge_graph(db: Session, user_id) -> GraphResponse:
             (ConceptMastery.concept_id == Concept.id) & (ConceptMastery.user_id == user_id),
         )
         .outerjoin(ReviewSchedule, ReviewSchedule.concept_mastery_id == ConceptMastery.id)
+        .order_by(Concept.slug)
         .all()
     )
 
