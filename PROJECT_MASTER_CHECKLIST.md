@@ -73,7 +73,10 @@
 
 ## Fase 2
 
-- [ ] Challenges + hints progresivos
+### Challenges + hints progresivos
+- [x] Challenges: cubierto por `Laboratory.type` (campo ya existente, sin modelo nuevo — ver `docs/superpowers/specs/2026-08-14-challenges-hints-design.md` decisión 1)
+- [x] Hint Dependency + Independence Score en el Dashboard
+
 - [ ] Gamificación (sobria)
 - [ ] Knowledge graph navegable — vista visual interactiva (hoy solo lista jerárquica vía relaciones)
 - [ ] Base de datos de vulnerabilidades
