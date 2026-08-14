@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.gamification.service import get_xp_summary, sync_achievements
 from app.models.content import Concept, Domain, Topic
 from app.models.lab import LabInstance
 from app.models.mastery import ConceptMastery, ReviewSchedule
@@ -124,6 +125,8 @@ def get_hint_dependency(db: Session, user_id) -> dict:
 
 def get_summary(db: Session, user_id) -> dict:
     hint_dependency = get_hint_dependency(db, user_id)
+    sync_achievements(db, user_id)
+    xp_summary = get_xp_summary(db, user_id)
     return {
         "global_mastery": get_global_mastery(db, user_id),
         "domains": get_domains_summary(db, user_id),
@@ -133,4 +136,7 @@ def get_summary(db: Session, user_id) -> dict:
         "recent_activity": get_recent_activity(db, user_id),
         "hint_dependency": hint_dependency["breakdown"],
         "independence_score": hint_dependency["independence_score"],
+        "xp_total": xp_summary["xp_total"],
+        "level": xp_summary["level"],
+        "achievements": xp_summary["achievements"],
     }

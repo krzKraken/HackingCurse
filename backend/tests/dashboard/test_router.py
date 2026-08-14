@@ -105,3 +105,60 @@ def test_dashboard_includes_hint_dependency_for_solved_lab(client, db_session):
     body = resp.json()
     assert body["hint_dependency"] == {"0": 1}
     assert body["independence_score"] == 100.0
+
+
+def test_dashboard_includes_gamification_fields_with_no_activity(client, db_session):
+    _login_as_owner(client, db_session)
+
+    resp = client.get("/api/v1/dashboard/summary")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["xp_total"] == 0
+    assert body["level"] == 1
+    assert body["achievements"] == []
+
+
+def test_dashboard_syncs_and_reports_achievement_after_solved_lab(client, db_session):
+    from datetime import datetime, timezone
+
+    from app.models.lab import Laboratory, LabInstance, LabInstanceStatus
+
+    user = _login_as_owner(client, db_session)
+
+    laboratory = Laboratory(
+        id="gami-router-test-lab",
+        title="Gami Router Test Lab",
+        type="black_box",
+        difficulty="beginner",
+        duration_estimate_min=10,
+        docker_build_context="labs/flagbox",
+        hints=[],
+        cpu_limit="0.5",
+        memory_limit_mb=128,
+        max_lifetime_min=30,
+        cleanup_remove_volumes=True,
+    )
+    db_session.add(laboratory)
+    db_session.commit()
+
+    instance = LabInstance(
+        laboratory_id=laboratory.id,
+        user_id=user.id,
+        status=LabInstanceStatus.destroyed,
+        context_seed={},
+        requested_at=datetime.now(timezone.utc),
+        solved=True,
+        hints_used=0,
+    )
+    db_session.add(instance)
+    db_session.commit()
+
+    resp = client.get("/api/v1/dashboard/summary")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["xp_total"] > 0
+    unlocked_keys = {a["key"] for a in body["achievements"]}
+    assert "first_shell" in unlocked_keys
+    assert "no_hint_required" in unlocked_keys

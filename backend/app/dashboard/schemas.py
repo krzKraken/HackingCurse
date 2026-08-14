@@ -30,6 +30,14 @@ class RecentActivityItem(BaseModel):
     answered_at: datetime
 
 
+class AchievementSummary(BaseModel):
+    key: str
+    title: str
+    description: str
+    xp_value: int
+    unlocked_at: datetime
+
+
 class DashboardSummary(BaseModel):
     global_mastery: float
     domains: list[DomainMasterySummary]
@@ -39,3 +47,6 @@ class DashboardSummary(BaseModel):
     recent_activity: list[RecentActivityItem]
     hint_dependency: dict[int, int]
     independence_score: float | None
+    xp_total: int
+    level: int
+    achievements: list[AchievementSummary]
