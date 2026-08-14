@@ -1,6 +1,14 @@
 from datetime import datetime, timezone
 
 from app.db import SessionLocal
+
+# LabInstance/LaboratoryConcept reference users.id/concepts.id by string FK.
+# SQLAlchemy configures mappers lazily and needs every referenced model
+# module imported somewhere in this process before the first flush/commit,
+# or it raises NoReferencedTableError. The API process gets these for free
+# via app.main's router imports; the worker process does not, so they must
+# be imported explicitly here.
+from app.models import content, user  # noqa: F401
 from app.models.lab import Laboratory, LabInstance, LabInstanceStatus
 from worker import docker_ops
 from worker.flag import generate_flag_token

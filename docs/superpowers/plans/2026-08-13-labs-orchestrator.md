@@ -1084,6 +1084,17 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'worker.jobs'`
 from datetime import datetime, timezone
 
 from app.db import SessionLocal
+
+# LabInstance/LaboratoryConcept reference users.id/concepts.id by string FK.
+# SQLAlchemy configures mappers lazily and needs every referenced model
+# module imported somewhere in this process before the first flush/commit,
+# or it raises NoReferencedTableError. The API process gets these for free
+# via app.main's router imports; the worker process does not (it never
+# imports app.main), so they must be imported explicitly here. This was
+# only caught by actually running the worker as its own process in Task 10
+# — the test suite never hit it because pytest's conftest imports the full
+# app (and therefore every model) into the same process regardless.
+from app.models import content, user  # noqa: F401
 from app.models.lab import Laboratory, LabInstance, LabInstanceStatus
 from worker import docker_ops
 from worker.flag import generate_flag_token
