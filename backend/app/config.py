@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     session_ttl_authenticated_seconds: int = 60 * 60 * 24 * 7
     login_max_attempts: int = 5
     login_lockout_seconds: int = 900
+    labs_terminal_relay_port: int = 8765
 
     model_config = SettingsConfigDict(env_file=".env")
 
