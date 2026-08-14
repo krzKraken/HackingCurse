@@ -82,8 +82,12 @@
 - [x] XP y niveles (calculado, no almacenado) en el Dashboard
 - [ ] Skill tree — explícitamente fuera de alcance del v1 (ver `docs/superpowers/specs/2026-08-14-gamificacion-design.md`)
 
+### Knowledge graph navegable
+- [x] Endpoint `GET /content/graph` (nodos = concepts con mastery del usuario, aristas = `ConceptRelationship`)
+- [x] Página `/graph` con auto-layout por fuerza, filtro por dominio, búsqueda y click-to-navigate
+- [x] Preview embebido en el Dashboard (reemplaza el placeholder "Knowledge Connectivity")
+
 ### Pendientes de Fase 2
-- [ ] Knowledge graph navegable — vista visual interactiva (hoy solo lista jerárquica vía relaciones)
 - [ ] Base de datos de vulnerabilidades
 - [ ] Error Memory completo (`ErrorPattern`)
 - [ ] Fragmentation score + ejercicios integradores
